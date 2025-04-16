@@ -5,6 +5,7 @@ import threading
 import signal
 import sys
 import speech_2_text.speech_2_text as s2t
+import prompt_llm.prompt_llm as pllm
 from dotenv import load_dotenv
 from discord.ext import commands
 
@@ -47,6 +48,16 @@ async def zulusummon(ctx):
         def send_message(text):
             coro = ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
             asyncio.run_coroutine_threadsafe(coro, bot.loop)        # allow async to run from normal thread
+
+            try:
+                print(f"Prompting de LLM: {text}")
+                llm_reply = pllm.prompt_llm(text)
+                coro = ctx.send(f"De Zulu say:\n{llm_reply}")
+                asyncio.run_coroutine_threadsafe(coro, bot.loop)
+            except Exception as e:
+                print(f"Error while sending LLM reply: {e}")
+                coro = ctx.send("De Zulu has lost contact with de spirit realm.")
+                asyncio.run_coroutine_threadsafe(coro, bot.loop)
 
         # run speech2text in background thread
         await asyncio.to_thread(s2t.transcribe, stop_event, send_message)
