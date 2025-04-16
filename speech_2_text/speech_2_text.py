@@ -83,7 +83,7 @@ def transcribe(stop_event, callback=None):
                             if is_transcribing:
                                 continue  # skip activation phrase from being transcribed
                         
-                        # Only process text if we're in transcribing mode
+                        # only process text if in transcribing mode
                         if is_transcribing:
                             # handle zulu over command
                             if "zulu over" in lower_text:
@@ -109,7 +109,7 @@ def transcribe(stop_event, callback=None):
                             
                             # regular speech (not containing commands) - only process if transcribing
                             else:
-                                # if ther eis pending activation phrase, filter it out
+                                # if there is pending activation phrase, filter it out
                                 if pending_activation:
                                     # check if any activation keyword is in text and remove it
                                     clean_text = recognized_text
