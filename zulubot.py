@@ -2,6 +2,8 @@ import discord
 import os
 import asyncio
 import threading
+import signal
+import sys
 import speech_2_text.speech_2_text as s2t
 from dotenv import load_dotenv
 from discord.ext import commands
@@ -17,6 +19,7 @@ intents.guilds = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 stop_event = threading.Event()
+exit_event = threading.Event()
 
 @bot.event
 async def on_ready():
@@ -38,8 +41,8 @@ async def zulusummon(ctx):
     
     # check that the bot is in voice channel
     if ctx.voice_client:
-        source = discord.FFmpegPCMAudio('assets/zulu.m4a')
-        ctx.voice_client.play(source)
+        # source = discord.FFmpegPCMAudio('assets/zulu.m4a')
+        # ctx.voice_client.play(source)
 
         def send_message(text):
             coro = ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
@@ -47,22 +50,6 @@ async def zulusummon(ctx):
 
         # run speech2text in background thread
         await asyncio.to_thread(s2t.transcribe, stop_event, send_message)
-
-        # read output file
-        # try:
-        #     with open("speech_2_text/output.txt", "r") as f:
-        #         text = f.read().strip()
-        #         if text:
-        #             # discord max limit is 2000 characters
-        #             if len(text) <= 2000:
-        #                 await ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
-        #             else:
-        #                 await ctx.send("Yu tok tu much. Characta limit is tu tousend")
-        #                 await ctx.send(file=discord.File("output.txt"))
-        #         else:
-        #             await ctx.send("De Zulu herd nuttin.")
-        # except FileNotFoundError:
-        #     await ctx.send("De Zulu found no output.")
 
         # disconnect after finishing
         await ctx.voice_client.disconnect()
@@ -78,5 +65,23 @@ async def zulubegone(ctx):
         await ctx.send("De Zulu is gon.")
     else:
         await ctx.send("De Zulu is not in de channel")
+
+ # handle termination signals like Ctrl+C
+def signal_handler(sig, frame):
+   
+    print("\nGracefully shutting down...")
+    
+    # signal threads to stop
+    stop_event.set()
+    exit_event.set()
+    
+    # schedule bot to close
+    asyncio.run_coroutine_threadsafe(bot.close(), bot.loop)
+    
+    print("Cleanup complete. Exiting.")
+    sys.exit(0)
+
+# register signal handler for SIGINT (Ctrl+C)
+signal.signal(signal.SIGINT, signal_handler)
 
 bot.run(TOKEN)
