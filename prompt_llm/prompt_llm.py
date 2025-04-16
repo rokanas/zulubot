@@ -12,7 +12,7 @@ client = genai.Client(api_key=API_KEY)
 def prompt_llm(message: str) -> str:
     try:
         prefix = (
-            "You are a mighty Zulu warrior. Answer the following message sounding like a mighty tribesman of the Zulu nation.:\n\n"
+            "You are a mighty Zulu warrior. Answer the following message sounding like a mighty tribesman of the Zulu nation:\n\n"
         )
 
         # combine prefix with the actual message
