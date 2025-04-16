@@ -1,4 +1,4 @@
-# discord-bot
+# zulubot
 
 A discord bot made for Zulu Empire server. 
 Currently only plays Zulu theme song.
