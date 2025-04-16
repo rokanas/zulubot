@@ -1,13 +1,15 @@
-# zulubot
+# Zulubot
 
 A discord bot made for Zulu Empire server. 
 
-Currently only plays Zulu theme song.
+Currently plays theme song and transcribes local mic input.
 
-Bot token is private.
+To run locally, install [ffmpeg](https://www.ffmpeg.org/download.html). Be sure to add it to PATH (Windows).
 
-Commands:
+Bot token is private so request the ```.env```.
 
-```!zulujoin``` to join voice channel (user must be in voice channel)
+## Commands:
 
-```!zululeavel``` to leave voice channel
+```!zulusummon``` to join voice channel (user must be in voice channel)
+
+```!zulubegone``` or say "Zulu begone" to leave voice channel
