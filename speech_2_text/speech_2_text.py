@@ -26,7 +26,7 @@ def transcribe(stop_event, callback=None):
                         channels=1,
                         rate=16000,
                         input=True,
-                        frames_per_buffer=8192)
+                        frames_per_buffer=2048)
 
         transcript_buffer = ""
         is_transcribing = False
