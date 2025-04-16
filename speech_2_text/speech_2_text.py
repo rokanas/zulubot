@@ -1,8 +1,9 @@
 import vosk
 import pyaudio
 import json
+import time
 
-def transcribe(stop_event):
+def transcribe(stop_event, callback=None):
     # set model path
     # download models from https://alphacephei.com/vosk/models
     model_path = "speech_2_text/models/vosk-model-small-en-us-0.15"
@@ -28,27 +29,72 @@ def transcribe(stop_event):
     # set path for output text file
     output_file_path = "speech_2_text/output.txt"
 
-    # open text file in write mode
-    with open(output_file_path, "w") as output_file:
-        print("Listening for speech. Say 'Zulu begone' to stop.")
+    # def reset_output_file():
+    #     with open(output_file_path, "w") as f:
+    #         f.write("")
 
-        # start streaming and recognize speech
-        while not stop_event.is_set():
-            data = stream.read(4096)        # read in chunks of 4096 bytes
-            if rec.AcceptWaveform(data):    # accept waveform of input voice
+    # # open text file in write mode
+    # with open(output_file_path, "w") as output_file:
+    #     print("Listening for speech. Say 'Zulu begone' to stop.")
 
-                # parse JSON result and get recognized text
-                result = json.loads(rec.Result())
-                recognized_text = result['text']
+    #     # reset output file
+    #     reset_output_file()
+
+    transcript_buffer = ""
+
+    print("Listening for speech. Say 'Zulu begone' to stop.")
+
+    # start streaming and recognize speech
+    while not stop_event.is_set():
+        data = stream.read(4096)        # read in chunks of 4096 bytes
+        if rec.AcceptWaveform(data):    # accept waveform of input voice
+
+            # parse JSON result and get recognized text
+            result = json.loads(rec.Result())
+            recognized_text = result['text']
+
+            if recognized_text:
+                lower_text = recognized_text.lower()
+
+                if "zulu over" in lower_text:
+                    # extract text before "zulu over"
+                    text_parts = lower_text.split("zulu over", 1)
+                    before_over = text_parts[0].strip()
+                    
+                    # add text before "zulu over" to buffer
+                    if before_over:
+                        transcript_buffer += before_over + " "
+                    
+                    # process complete buffer
+                    if transcript_buffer.strip():
+                        print(f"Sending buffer: {transcript_buffer.strip()}")
+                        if callback:
+                            callback(transcript_buffer.strip())
+                        
+                        # # write to file if needed
+                        # with open(output_file_path, "w") as f:
+                        #     f.write(transcript_buffer.strip() + "\n")
+                    
+                    # Reset buffer after processing
+                    transcript_buffer = ""
                 
-                # write recognized text to file
-                output_file.write(recognized_text + "\n")
-                print(recognized_text)
-                
-                # check for the termination keyword            
-                if any(keyword in recognized_text.lower() for keyword in ["zulu begone", "zulu be gone", "zulu begun"]):
+                # check for termination keyword
+                elif any(keyword in lower_text for keyword in ["zulu begone", "zulu be gone", "zulu begun"]):
                     print("Zulu banished. Stopping...")
                     break
+                
+                # regular speech (not containing commands)
+                else:
+                    print(recognized_text)
+                    transcript_buffer += recognized_text + " "
+        
+        # also process partial results to get more real-time responses
+        # ensures 'zulu over' is detected even if said without sufficient pause
+        partial_result = json.loads(rec.PartialResult())
+        if 'partial' in partial_result and partial_result['partial']:
+            partial_text = partial_result['partial'].lower()
+            if "zulu over" in partial_text and transcript_buffer.strip():
+                print(f"[Partial] Detected 'zulu over' command")
 
     # stop and close stream
     stream.stop_stream()
