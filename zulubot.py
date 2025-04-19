@@ -1,113 +1,186 @@
-import discord
+# zulubot.py - main bot file
 import os
 import asyncio
 import threading
 import signal
 import sys
-import speech_2_text.speech_2_text as s2t
-import prompt_llm.prompt_llm as pllm
-import text_2_speech.text_2_speech as t2s
+import random
 from dotenv import load_dotenv
+import discord
 from discord.ext import commands
-from discord import FFmpegPCMAudio
 
+from modules.speech_processor import SpeechProcessor
+from modules.llm_client import LLMClient
+from modules.tts_client import TTSClient
+
+# load env variables
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-intents = discord.Intents.default()
-intents.message_content = True
-intents.voice_states = True
-intents.guilds = True
+class ZuluBot:
+    def __init__(self):
+        # initialize discord bot
+        intents = discord.Intents.default()
+        intents.message_content = True
+        intents.voice_states = True
+        intents.guilds = True
+        
+        self.bot = commands.Bot(command_prefix="!", intents=intents)
+        self.setup_commands()
+        
+        # initialize clients
+        self.llm = LLMClient()
+        self.tts = TTSClient()
+        self.speech_processor = SpeechProcessor()
+        
+        # control flags
+        self.stop_event = threading.Event()
+        
+        # setup signal handlers
+        signal.signal(signal.SIGINT, self.signal_handler)
 
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-stop_event = threading.Event()
-exit_event = threading.Event()
-
-@bot.event
-async def on_ready():
-    print(f'Logged in as {bot.user}!')
-
-@bot.command()
-async def zulusummon(ctx):
-    global stop_event
-    stop_event.clear()
-
-    # check if summoner is in voice channel
-    if not ctx.author.voice:
-        await ctx.send("Yu ah not in de channel")
-        return
+        # error messages
+        self.error_messages = [
+            "De Zulu has lost contact with de spirit realm. Try agen soon",
+            "De Zulu is lost in de savannah. Try agen soon.",
+            "De Zulu lost de battle wit de lion. Try agen soon.",
+            "De wisdom of de Zulu is clouded. Try agen soon.",
+        ]
     
-    channel = ctx.author.voice.channel
-    await channel.connect()
-    await ctx.send(f"De Zulu is hia.")
+    def setup_commands(self):
+        """setup zulubot !commands"""
+        @self.bot.event
+        async def on_ready():
+            print(f'Logged in as {self.bot.user}!')
+        
+        @self.bot.command()
+        async def zulusummon(ctx):
+            await self.handle_summon(ctx)
+
+        @self.bot.command()
+        async def zuluask(ctx, *, text=""):
+            await self.handle_ask(ctx, text)
+            
+        @self.bot.command()
+        async def zulubegone(ctx):
+            await self.handle_begone(ctx)
+        
+    async def handle_summon(self, ctx):
+        self.stop_event.clear()
+        
+        # check if summoner is in voice channel
+        if not ctx.author.voice:
+            await ctx.send("Yu ah not in de channel.")
+            return
+        
+        summoner_channel = ctx.author.voice.channel
+
+        # check if zulubot is already in voice channel
+        if ctx.voice_client and ctx.voice_client.is_connected():
+            # if already in summoner's channel, do nothing
+            if ctx.voice_client.channel == summoner_channel:
+                await ctx.send("De Zulu is already in de channel.")
+                return
+            # if in different voice channel, move to summoner's
+            else:
+                await ctx.voice_client.move_to(summoner_channel)
+                await ctx.send(f"De Zulu has moved ova to **{summoner_channel.name}**.")
+                return
+
+        # zulubot joins summoner's voice channel
+        await summoner_channel.connect()
+        await ctx.send(f"De Zulu is hia.")
+        
+        # start speech processing if connected to voice
+        if ctx.voice_client:
+            # create callback to handle transcribed text
+            async def message_callback(text):
+                await ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
+                await self.process_text_input(ctx, text)
+            
+            # run speech recognition in background
+            await asyncio.to_thread(
+                self.speech_processor.transcribe, 
+                self.stop_event,
+                lambda text: asyncio.run_coroutine_threadsafe(message_callback(text), self.bot.loop)
+            )
+            
+            # disconnect after finishing
+            if ctx.voice_client:
+                await ctx.voice_client.disconnect()
+                await ctx.send("De Zulu is gon.")
+
+    async def handle_ask(self, ctx, text):
+        """process user message from discord text chat"""
+        # if user provides no text
+        if not text:
+            await ctx.send("Speak tu me, warrior! Yu must provide de text.")
+            return
+        
+        if ctx.voice_client and ctx.voice_client.is_connected():
+            # if bot is in voice channel, respond in voice chat (llm and tts pipeline)
+            await self.process_text_input(ctx, text)
+        else:
+            # if not in voice channel, respond in text chat (llm only)
+            llm_response = await asyncio.to_thread(self.llm.generate_response, text, self.error_messages)
+            await ctx.send(llm_response)
     
-    # check that the bot is in voice channel
-    if ctx.voice_client:
-        # source = discord.FFmpegPCMAudio('assets/zulu.m4a')
-        # ctx.voice_client.play(source)
+    async def handle_begone(self, ctx):
+        self.stop_event.set()
 
-        def send_message(text):
-            coro = ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
-            asyncio.run_coroutine_threadsafe(coro, bot.loop)        # allow async to run from normal thread
-
-            try:
-                print(f"Prompting de LLM: {text}")
-                llm_reply = pllm.prompt_llm(text)
+        if ctx.voice_client:
+            if ctx.voice_client.is_playing():
+                ctx.voice_client.stop()
+            await ctx.voice_client.disconnect()
+            await ctx.send("De Zulu is gon.")
+            print("Zulu disconnected from voice channel.")
+        else:
+            await ctx.send("De Zulu is not in de channel")
+    
+    async def process_text_input(self, ctx, text):
+        """process text through llm and tts pipeline"""
+        try:
+            # get llm response
+            llm_response = await asyncio.to_thread(self.llm.generate_response, text, self.error_messages)
+            
+            # convert llm response to speech
+            if ctx.voice_client:
+                tts_path = await self.tts.generate_speech(llm_response)
                 
-                # run async text-to-speech coroutine safely from thread
-                future = asyncio.run_coroutine_threadsafe(t2s.text_2_speech(llm_reply), bot.loop)
-                tts_path = future.result()
-
-                if tts_path and ctx.voice_client:
-                    source = FFmpegPCMAudio(tts_path)
+                # play speech in voice channel
+                if tts_path:
+                    source = discord.FFmpegPCMAudio(tts_path)
                     ctx.voice_client.play(source)
+                    print("LLM response:", llm_response)
 
-                # wait until audio is done playing before deleting
-                while ctx.voice_client.is_playing():
-                    asyncio.run_coroutine_threadsafe(asyncio.sleep(1), bot.loop).result()
+                    # always send text response
+                    await ctx.send(f"De Zulu speaks: {llm_response}")
+                    
+                    # wait for speech to finish playing
+                    while ctx.voice_client and ctx.voice_client.is_playing():
+                        await asyncio.sleep(0.5)
 
-                os.remove(tts_path)
+                    print("Listening again for activation phrase: 'Zulubot'")
+                    
+                    # clean up audio file
+                    os.remove(tts_path)
                 
-            except Exception as e:
-                print(f"Error while sending LLM reply: {e}")
-                coro = ctx.send("De Zulu has lost contact with de spirit realm.")
-                asyncio.run_coroutine_threadsafe(coro, bot.loop)
-
-        # run speech2text in background thread
-        await asyncio.to_thread(s2t.transcribe, stop_event, send_message)
-
-        # disconnect after finishing
-        await ctx.voice_client.disconnect()
-        await ctx.send("De Zulu is gon.")
-
-@bot.command()
-async def zulubegone(ctx):
-    global stop_event
-    stop_event.set()     # break the transcribe() loop if running to avoid hanging function
-
-    if ctx.voice_client:
-        await ctx.voice_client.disconnect()
-        await ctx.send("De Zulu is gon.")
-    else:
-        await ctx.send("De Zulu is not in de channel")
-
- # handle termination signals like Ctrl+C
-def signal_handler(sig, frame):
-   
-    print("\nGracefully shutting down...")
+        except Exception as e:
+            print(f"Error in processing pipeline: {e}")
+            await ctx.send(random.choice(self.error_messages))
     
-    # signal threads to stop
-    stop_event.set()
-    exit_event.set()
+    # signal handler for graceful shutdown (ctrol+c)
+    def signal_handler(self, sig, frame):
+        print("\nGracefully shutting down...")
+        self.stop_event.set()
+        asyncio.run_coroutine_threadsafe(self.bot.close(), self.bot.loop)
+        print("Cleanup complete. Exiting.")
+        sys.exit(0)
     
-    # schedule bot to close
-    asyncio.run_coroutine_threadsafe(bot.close(), bot.loop)
-    
-    print("Cleanup complete. Exiting.")
-    sys.exit(0)
+    def run(self):
+        self.bot.run(TOKEN)
 
-# register signal handler for SIGINT (Ctrl+C)
-signal.signal(signal.SIGINT, signal_handler)
-
-bot.run(TOKEN)
+# run bot if file is executed directly
+if __name__ == "__main__":
+    bot = ZuluBot()
+    bot.run()
