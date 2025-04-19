@@ -56,20 +56,15 @@ class ZuluBot:
         @self.bot.command()
         async def zulusummon(ctx):
             await self.handle_summon(ctx)
+
+        @self.bot.command()
+        async def zuluask(ctx, *, text=""):
+            await self.handle_ask(ctx, text)
             
         @self.bot.command()
         async def zulubegone(ctx):
             await self.handle_begone(ctx)
         
-        @self.bot.command()
-        async def zuluask(ctx, *, text=""):
-            """process user message from discord text chat"""
-            if not text:
-                await ctx.send("Speak tu me, warrior! Yu must provide de text.")
-                return
-                
-            await self.process_text_input(ctx, text)
-    
     async def handle_summon(self, ctx):
         self.stop_event.clear()
         
@@ -114,6 +109,21 @@ class ZuluBot:
             if ctx.voice_client:
                 await ctx.voice_client.disconnect()
                 await ctx.send("De Zulu is gon.")
+
+    async def handle_ask(self, ctx, text):
+        """process user message from discord text chat"""
+        # if user provides no text
+        if not text:
+            await ctx.send("Speak tu me, warrior! Yu must provide de text.")
+            return
+        
+        if ctx.voice_client and ctx.voice_client.is_connected():
+            # if bot is in voice channel, respond in voice chat (llm and tts pipeline)
+            await self.process_text_input(ctx, text)
+        else:
+            # if not in voice channel, respond in text chat (llm only)
+            llm_response = await asyncio.to_thread(self.llm.generate_response, text, self.error_messages)
+            await ctx.send(llm_response)
     
     async def handle_begone(self, ctx):
         self.stop_event.set()
@@ -123,6 +133,7 @@ class ZuluBot:
                 ctx.voice_client.stop()
             await ctx.voice_client.disconnect()
             await ctx.send("De Zulu is gon.")
+            print("Zulu disconnected from voice channel.")
         else:
             await ctx.send("De Zulu is not in de channel")
     
