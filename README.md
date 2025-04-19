@@ -6,11 +6,13 @@ To run locally, install [ffmpeg](https://www.ffmpeg.org/download.html). Be sure 
 
 Bot token and API keys are private so request the ```.env```.
 
-Currently only transcribes local mic input.
+Currently only transcribes local mic input for voice commands.
 
 ## Commands:
 
 ```!zulusummon``` to join voice channel (user must be in voice channel)
+
+```!zuluask``` to submit message (from either text chat or voice chat)
 
 ```!zulubegone``` to leave voice channel
 
@@ -18,6 +20,6 @@ Currently only transcribes local mic input.
 
 *"Zulubot"* to start listening
 
-*"Zulu over"* to stop listening
+*"Answer me Zulu"* to stop listening and submit message
 
 *"Zulu begone"* to leave voice channel
