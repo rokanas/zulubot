@@ -12,9 +12,12 @@ Currently only transcribes local mic input for voice commands.
 
 ```!zulusummon``` to join voice channel (user must be in voice channel)
 
-```!zuluask``` to submit message (from either text chat or voice chat)
+```!zuluask <message>``` to submit message (from either text chat or voice chat)
 
 ```!zulubegone``` to leave voice channel
+
+```!zulucrypto <message>``` to return live data on a crypto coin (or top 5 coins by market cap if no parameter is provided)
+
 
 ### Voice commands (when Zulubot is in voice channel):
 
