@@ -154,7 +154,13 @@ class ZuluBot:
     async def handle_crypto(self, ctx, text):
         """fetch crypto data from coinmarketcap"""
         async with ctx.typing():
-            crypto_data = await asyncio.to_thread(self.crypto.fetch_crypto_data, text)
+            if not text:
+                # if user doesn't specify coin, get top coins
+                crypto_data = await asyncio.to_thread(self.crypto.fetch_top_coins)
+            else:
+                # get user specified coin
+                crypto_data = await asyncio.to_thread(self.crypto.fetch_coin_data, text)
+            
             await ctx.send(embed=crypto_data)
 
     async def handle_music(self, ctx, text):
