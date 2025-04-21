@@ -16,13 +16,13 @@ Currently only transcribes local mic input for voice commands.
 
 ```!zulubegone``` to leave voice channel
 
-```!zulucrypto <message>``` to return live data on a crypto coin (or top 5 coins by market cap if no parameter is provided)
+```!zulucrypto <coin>``` to return live data on a crypto coin by name or symbol (or top 6 coins by market cap if no coin is provided)
 
 
 ### Voice commands (when Zulubot is in voice channel):
 
 *"Zulubot"* to start listening
 
-*"Answer me Zulu"* to stop listening and submit message
+*"Answer me, Zulu"* to stop listening and submit message
 
 *"Zulu begone"* to leave voice channel
