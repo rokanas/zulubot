@@ -234,6 +234,9 @@ class CryptoClient:
             description="De Zulu present de top coins by market cap:",
             color=discord.Color.gold()
         )
+
+        # set thumbnail to coinmarketcap logo
+        embed.set_thumbnail(url="https://play-lh.googleusercontent.com/kCKeckQNFF9P2470x4lF9v3OW_ZZtvk1SIo9RmvJDa6WtBboqfzyefEZ2_rwWRYgM_M")
         
         # iterate to add each coin to embed
         for coin in coins:
