@@ -68,56 +68,47 @@ class CryptoClient:
 
     def fetch_coin_data(self, text):
         """fetch data for specific cryptocurrency by name or symbol"""
-        # 1. try searching by symbol
+        found_coins = {}
+
+        # helper to process api response + add valid entries to found coins list
+        def add_found_coins(response):
+            json_data = json.loads(response.text)
+            if "data" in json_data and json_data["data"]:
+                for coin in json_data["data"].values():
+                    coin_id = coin.get("id")
+                    if isinstance(coin_id, int):
+                        found_coins[coin_id] = coin
+
+        # 1. search by symbol
         symbol = text.upper()
         symbol_params = {
             'symbol': symbol,
             'convert': 'USD'
         }
-        
-        # fetch data from api
         response = self.session.get(self.quotes_url, params=symbol_params)
-        json_data = json.loads(response.text)
-        
-        # check if data is available
-        if "data" in json_data and json_data["data"]:
-            # check if symbol is in data dictionary, return it if so
-            if symbol in json_data["data"]:
-                # if data is a list, keep first entry
-                coin_data = json_data["data"][symbol][0] if isinstance(json_data["data"][symbol], list) else json_data["data"][symbol]
-                
-                # fetch coin_metadata using coin_id
-                coin_metadata = self.fetch_coin_metadata(coin_data["id"])
-                
-                # parse both coin_data and coin_metadata
-                parsed_coin = self.parse_single_coin(coin_data, coin_metadata)
-                
-                return self.create_single_coin_embed(parsed_coin)
+        add_found_coins(response)
 
-        # 2. try searching by slug
-        slug = text.lower().replace(' ', '-')   # convert spaces to hyphens
+        # 2. search by slug
+        slug = text.lower().replace(' ', '-')
         slug_params = {
             'slug': slug,
             'convert': 'USD'
         }
-        
-        # fetch data from api
         response = self.session.get(self.quotes_url, params=slug_params)
-        json_data = json.loads(response.text)
-        
-        # check if data is available
-        if "data" in json_data and json_data["data"]:
-            # for slug-based search, convert to list and get first item
-            coin_id = list(json_data["data"].keys())[0]
-            coin_data = json_data["data"][coin_id]
-            
+        add_found_coins(response)
+
+        # 3. if coins found, pick the one with lowest id (most relevant)
+        if found_coins:
+            lowest_id = min(found_coins.keys())
+            coin_data = found_coins[lowest_id]
+
             # fetch coin_metadata using coin_id
             coin_metadata = self.fetch_coin_metadata(coin_data["id"])
-            
+
             # parse both coin_data and coin_metadata
             parsed_coin = self.parse_single_coin(coin_data, coin_metadata)
-            
-            return self.create_single_coin_embed(parsed_coin)
+
+            return self.create_coin_embed(parsed_coin)
         
         # if coin isn't found, return error embed
         return self.create_error_embed("Coin Not Found", 
@@ -197,33 +188,11 @@ class CryptoClient:
 
         # iterate through each coin 
         for coin in coins_data.get("data", []):
-            # extract general data
-            name = coin.get("name", "Unknown")
-            symbol = coin.get("symbol", "")
-            quote = coin.get("quote", {}).get("USD", {})
+            # reuse parse_single_coin (pass empty metadata)
+            parsed_coin = self.parse_single_coin(coin, {})
             
-            # extract price data
-            price = quote.get("price") or 0
-            change_1h = quote.get("percent_change_1h") or 0
-            change_24h = quote.get("percent_change_24h") or 0
-            change_7d = quote.get("percent_change_7d") or 0
-            
-            # format price changes with arrows
-            change_1h_formatted = f"{self.up_arrow if change_1h >= 0 else self.down_arrow} {abs(change_1h):.2f}%"
-            change_24h_formatted = f"{self.up_arrow if change_24h >= 0 else self.down_arrow} {abs(change_24h):.2f}%"
-            change_7d_formatted = f"{self.up_arrow if change_7d >= 0 else self.down_arrow} {abs(change_7d):.2f}%"
-            
-            entry = {
-                "key": f"{name.lower()}|{symbol.lower()}",
-                "name": name,
-                "symbol": symbol,
-                "price": f"${price:,.2f}",
-                "change_1h": change_1h_formatted,
-                "change_24h": change_24h_formatted,
-                "change_7d": change_7d_formatted,
-            }
-
-            parsed_data.append(entry)
+            # add parsed coin to results list
+            parsed_data.append(parsed_coin)
 
         return parsed_data
     
@@ -256,7 +225,7 @@ class CryptoClient:
         embed.set_footer(text=self.footer)
         return embed
     
-    def create_single_coin_embed(self, coin):
+    def create_coin_embed(self, coin):
         """create embed for specific coin"""
         symbol = coin['symbol']
         name = coin['name']
