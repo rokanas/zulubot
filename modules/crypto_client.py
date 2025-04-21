@@ -257,6 +257,7 @@ class CryptoClient:
         """create embed for specific coin"""
         symbol = coin['symbol']
         name = coin['name']
+        slug = coin['slug']
         description = f"De Zulu present de details for {name} ({symbol}):"
 
         # add description if available
@@ -289,6 +290,10 @@ class CryptoClient:
         embed.add_field(name="Total Supply", value=coin['total_supply'], inline=True)
         embed.add_field(name="Max Supply", value=coin['max_supply'], inline=True)
         
+        # add link to coinmarketcap page
+        cmc_url = f"https://coinmarketcap.com/currencies/{slug}/"
+        embed.add_field(name="\u200b", value=f"[View de full coin profile]({cmc_url})", inline=False)
+
         embed.set_footer(text=self.footer)
         return embed
         
