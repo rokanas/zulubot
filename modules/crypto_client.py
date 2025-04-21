@@ -12,8 +12,8 @@ class CryptoClient:
         load_dotenv()
         self.api_key = os.getenv('COINMARKETCAP_API_KEY')
         self.listings_url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
+        self.quotes_url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'
         self.metadata_url = 'https://pro-api.coinmarketcap.com/v2/cryptocurrency/info'
-        self.search_url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'
         self.session = Session()
         self.session.headers.update({
             'Accepts': 'application/json',
@@ -68,32 +68,7 @@ class CryptoClient:
 
     def fetch_coin_data(self, text):
         """fetch data for specific cryptocurrency by name or symbol"""
-        # 1. try searching by slug
-        slug = text.lower().replace(' ', '-')   # convert spaces to hyphens
-        slug_params = {
-            'slug': slug,
-            'convert': 'USD'
-        }
-        
-        # fetch data from api
-        response = self.session.get(self.search_url, params=slug_params)
-        json_data = json.loads(response.text)
-        
-        # check if data is available
-        if "data" in json_data and json_data["data"]:
-            # for slug-based search, convert to list and get first item
-            coin_id = list(json_data["data"].keys())[0]
-            coin_data = json_data["data"][coin_id]
-            
-            # fetch coin_metadata using coin_id
-            coin_metadata = self.fetch_coin_metadata(coin_data["id"])
-            
-            # parse both coin_data and coin_metadata
-            parsed_coin = self.parse_single_coin(coin_data, coin_metadata)
-            
-            return self.create_single_coin_embed(parsed_coin)
-        
-        # 2. try searching by symbol
+        # 1. try searching by symbol
         symbol = text.upper()
         symbol_params = {
             'symbol': symbol,
@@ -101,7 +76,7 @@ class CryptoClient:
         }
         
         # fetch data from api
-        response = self.session.get(self.search_url, params=symbol_params)
+        response = self.session.get(self.quotes_url, params=symbol_params)
         json_data = json.loads(response.text)
         
         # check if data is available
@@ -118,6 +93,31 @@ class CryptoClient:
                 parsed_coin = self.parse_single_coin(coin_data, coin_metadata)
                 
                 return self.create_single_coin_embed(parsed_coin)
+
+        # 2. try searching by slug
+        slug = text.lower().replace(' ', '-')   # convert spaces to hyphens
+        slug_params = {
+            'slug': slug,
+            'convert': 'USD'
+        }
+        
+        # fetch data from api
+        response = self.session.get(self.quotes_url, params=slug_params)
+        json_data = json.loads(response.text)
+        
+        # check if data is available
+        if "data" in json_data and json_data["data"]:
+            # for slug-based search, convert to list and get first item
+            coin_id = list(json_data["data"].keys())[0]
+            coin_data = json_data["data"][coin_id]
+            
+            # fetch coin_metadata using coin_id
+            coin_metadata = self.fetch_coin_metadata(coin_data["id"])
+            
+            # parse both coin_data and coin_metadata
+            parsed_coin = self.parse_single_coin(coin_data, coin_metadata)
+            
+            return self.create_single_coin_embed(parsed_coin)
         
         # if coin isn't found, return error embed
         return self.create_error_embed("Coin Not Found", 
