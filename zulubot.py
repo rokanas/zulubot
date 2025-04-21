@@ -6,6 +6,7 @@ import signal
 import sys
 import random
 from dotenv import load_dotenv
+
 import discord
 from discord.ext import commands
 
@@ -13,6 +14,7 @@ from modules.speech_processor import SpeechProcessor
 from modules.llm_client import LLMClient
 from modules.tts_client import TTSClient
 from modules.crypto_client import CryptoClient
+from modules.music_player import MusicPlayer
 
 # unused error message: "De Zulu can track de great wildebeest, but (...)"
 
@@ -72,6 +74,10 @@ class ZuluBot:
         @self.bot.command()
         async def zulucrypto(ctx, *, text=""):
             await self.handle_crypto(ctx, text)
+
+        @self.bot.command()
+        async def zulumusic(ctx, *, text=""):
+            await self.handle_music(ctx, text)
         
     async def handle_summon(self, ctx):
         self.stop_event.clear()
@@ -150,6 +156,28 @@ class ZuluBot:
         async with ctx.typing():
             crypto_data = await asyncio.to_thread(self.crypto.fetch_crypto_data, text)
             await ctx.send(embed=crypto_data)
+
+    async def handle_music(self, ctx, text):
+        """play music from youtube"""
+        if not text:
+            await ctx.send("Yu must provide mo info. Use !zuluhelp for de documentation.")
+            return
+        
+        # reuse zulu summon logic
+        self.handle_summon(ctx)
+
+        # download and play music
+        await asyncio.to_thread(self.music_player.download_vid, text)
+        music_name = self.music_player.find_music_name()
+        
+        source = discord.FFmpegPCMAudio(music_name)
+        ctx.voice_client.play(source)
+
+        # wait for music to finish playing
+        while ctx.voice_client and ctx.voice_client.is_playing():
+            await asyncio.sleep(0.5)
+
+        print("Listening again for activation phrase: 'Zulubot'")
 
     async def process_text_input(self, ctx, text):
         """process text through llm and tts pipeline"""
