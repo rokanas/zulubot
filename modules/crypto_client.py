@@ -5,6 +5,24 @@ from dotenv import load_dotenv
 import json
 import os
 import discord
+import functools
+
+def handle_exceptions(func):
+    """decorator for handling crypto api exceptions"""
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        func_name = func.__name__
+        try:
+            return func(self, *args, **kwargs)
+        except (ConnectionError, Timeout, TooManyRedirects) as e:
+            print(f"Error in {func_name} {e}")
+            return self.create_error_embed("Connection Error", 
+                "De spirits of de digital realm are silent today. De Zulu cannot reach dem... Try again later.")
+        except Exception as e:
+            print(f"Error in {func_name}: {e}")
+            return self.create_error_embed("Error",
+                "De Zulu has failed to hona de command and has brought shame upon de tribe.")
+    return wrapper
 
 # endpoint overview: https://coinmarketcap.com/api/documentation/v1/#section/Endpoint-Overview
 class CryptoClient:
@@ -25,47 +43,7 @@ class CryptoClient:
 
         self.footer = "De data provided by de CoinMarketCap"
 
-    def fetch_crypto_data(self, text):
-        """main entry point for fetching crypto data"""
-        try:
-            if not text:
-                # if user doesn't specify coin, get top coins
-                return self.fetch_top_coins()
-            else:
-                # get user specified coin
-                return self.fetch_coin_data(text)
-        
-        # network errors
-        except (ConnectionError, Timeout, TooManyRedirects) as e:
-            print(f"Error fetching data: {e}")
-            return self.create_error_embed("Connection Error", 
-                "De spirits of de digital realm are silent today. De Zulu cannot reach dem... Try again later.")
-        
-        # catch-all for unexpected errors
-        except Exception as e:
-            print(f"Unexpected error: {e}")
-            return self.create_error_embed("Error",
-                "De Zulu has failed to hona de command and has brought shame upon de tribe.")
-
-    def fetch_top_coins(self):
-        """fetch top cryptocurrencies by market cap"""
-        # define request parameters
-        params = {
-            'start': '1',
-            'limit': '6', # get top 6
-            'convert': 'USD'
-        }
-        
-        # fetch data from api
-        response = self.session.get(self.listings_url, params=params)
-        json_data = json.loads(response.text)
-        
-        # parse data
-        parsed_data = self.parse_top_coins(json_data)
-        
-        # create and return embed
-        return self.create_top_coins_embed(parsed_data)
-
+    @handle_exceptions
     def fetch_coin_data(self, text):
         """fetch data for specific cryptocurrency by name or symbol"""
         found_coins = {}
@@ -86,6 +64,7 @@ class CryptoClient:
             'convert': 'USD'
         }
         response = self.session.get(self.quotes_url, params=symbol_params)
+        self.check_response_code(response, "fetch_coin_data")
         add_found_coins(response)
 
         # 2. search by slug
@@ -95,6 +74,7 @@ class CryptoClient:
             'convert': 'USD'
         }
         response = self.session.get(self.quotes_url, params=slug_params)
+        self.check_response_code(response, "fetch_coin_data")
         add_found_coins(response)
 
         # 3. if coins found, pick the one with lowest id (most relevant)
@@ -113,23 +93,35 @@ class CryptoClient:
         # if coin isn't found, return error embed
         return self.create_error_embed("Coin Not Found", 
             f"De Zulu knows many coins, but '{text}' is not among dem. Perhaps it is called by anudda name, or it is too small for de great spirits to notice.")
-       
+
     def fetch_coin_metadata(self, coin_id):
         """fetch coin_metadata for given coin id"""
-        try:
-            # define request parameters and fetch data from api
-            params = {'id': str(coin_id)}   # api requires id parameter as string
-            response = self.session.get(self.metadata_url, params=params)
-            
-            if response.status_code == 200:
-                return json.loads(response.text)
-            else:
-                print(f"Error fetching coin_metadata: Status {response.status_code}, Response: {response.text}")
-                return {"data": {}}
-
-        except Exception as e:
-            print(f"Error fetching coin_metadata: {e}")
-            return {"data": {}}
+        # define request parameters and fetch data from api
+        params = {'id': str(coin_id)}   # api requires id parameter as string
+        response = self.session.get(self.metadata_url, params=params)
+        self.check_response_code(response, "fetch_coin_metadata")
+        return json.loads(response.text)
+    
+    @handle_exceptions
+    def fetch_top_coins(self):
+        """fetch top cryptocurrencies by market cap"""
+        # define request parameters
+        params = {
+            'start': '1',
+            'limit': '6', # get top 6
+            'convert': 'USD'
+        }
+        
+        # fetch data from api
+        response = self.session.get(self.listings_url, params=params)
+        self.check_response_code(response, "fetch_top_coins")
+        json_data = json.loads(response.text)
+        
+        # parse data
+        parsed_data = self.parse_top_coins(json_data)
+        
+        # create and return embed
+        return self.create_top_coins_embed(parsed_data)
         
     def parse_single_coin(self, coin_data, coin_metadata):
         """parse single coin data from api responses"""
@@ -196,35 +188,6 @@ class CryptoClient:
 
         return parsed_data
     
-    def create_top_coins_embed(self, coins):
-        """create embed for top coins"""
-        embed = discord.Embed(
-            title="De Top Cryptocurrencies",
-            description="De Zulu present de top coins by market cap:",
-            color=discord.Color.gold()
-        )
-
-        # set thumbnail to coinmarketcap logo
-        embed.set_thumbnail(url="https://play-lh.googleusercontent.com/kCKeckQNFF9P2470x4lF9v3OW_ZZtvk1SIo9RmvJDa6WtBboqfzyefEZ2_rwWRYgM_M")
-        
-        # iterate to add each coin to embed
-        for coin in coins:
-            field_value = (
-                f"Price: {coin['price']}\n"
-                f"1h: {coin['change_1h']}\n"
-                f"24h: {coin['change_24h']}\n"
-                f"7d: {coin['change_7d']}"
-            )
-            
-            embed.add_field(
-                name=f"{coin['name']} ({coin['symbol']})",
-                value=field_value,
-                inline=True
-            )
-        
-        embed.set_footer(text=self.footer)
-        return embed
-    
     def create_coin_embed(self, coin):
         """create embed for specific coin"""
         symbol = coin['symbol']
@@ -268,7 +231,36 @@ class CryptoClient:
 
         embed.set_footer(text=self.footer)
         return embed
+    
+    def create_top_coins_embed(self, coins):
+        """create embed for top coins"""
+        embed = discord.Embed(
+            title="De Top Cryptocurrencies",
+            description="De Zulu present de top coins by market cap:",
+            color=discord.Color.gold()
+        )
+
+        # set thumbnail to coinmarketcap logo
+        embed.set_thumbnail(url="https://play-lh.googleusercontent.com/kCKeckQNFF9P2470x4lF9v3OW_ZZtvk1SIo9RmvJDa6WtBboqfzyefEZ2_rwWRYgM_M")
         
+        # iterate to add each coin to embed
+        for coin in coins:
+            field_value = (
+                f"Price: {coin['price']}\n"
+                f"1h: {coin['change_1h']}\n"
+                f"24h: {coin['change_24h']}\n"
+                f"7d: {coin['change_7d']}"
+            )
+            
+            embed.add_field(
+                name=f"{coin['name']} ({coin['symbol']})",
+                value=field_value,
+                inline=True
+            )
+        
+        embed.set_footer(text=self.footer)
+        return embed
+
     def create_error_embed(self, title, message):
         """create error message embed"""
         embed = discord.Embed(
@@ -277,3 +269,11 @@ class CryptoClient:
             color=discord.Color.red()
         )
         return embed
+    
+    def check_response_code(self, response, func_name):
+        """check response status code and raise exception if not 200"""
+        if response.status_code != 200:
+            error_msg = f"API returned status code {response.status_code}: {response.text}"
+            print(f"Error in {func_name}: {error_msg}")
+            raise ConnectionError(error_msg)
+        return response
