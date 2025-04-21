@@ -147,8 +147,9 @@ class ZuluBot:
 
     async def handle_crypto(self, ctx, text):
         """fetch crypto data from coinmarketcap"""
-        crypto_data = await asyncio.to_thread(self.crypto.get_crypto_data, text)
-        await ctx.send(crypto_data)
+        async with ctx.typing():
+            crypto_data = await asyncio.to_thread(self.crypto.fetch_crypto_data, text)
+            await ctx.send(embed=crypto_data)
 
     async def process_text_input(self, ctx, text):
         """process text through llm and tts pipeline"""
