@@ -12,6 +12,9 @@ from discord.ext import commands
 from modules.speech_processor import SpeechProcessor
 from modules.llm_client import LLMClient
 from modules.tts_client import TTSClient
+from modules.crypto_client import CryptoClient
+
+# unused error message: "De Zulu can track de great wildebeest, but (...)"
 
 # load env variables
 load_dotenv()
@@ -31,6 +34,7 @@ class ZuluBot:
         # initialize clients
         self.llm = LLMClient()
         self.tts = TTSClient()
+        self.crypto = CryptoClient()
         self.speech_processor = SpeechProcessor()
         
         # control flags
@@ -64,6 +68,10 @@ class ZuluBot:
         @self.bot.command()
         async def zulubegone(ctx):
             await self.handle_begone(ctx)
+
+        @self.bot.command()
+        async def zulucrypto(ctx, *, text=""):
+            await self.handle_crypto(ctx, text)
         
     async def handle_summon(self, ctx):
         self.stop_event.clear()
@@ -136,7 +144,13 @@ class ZuluBot:
             print("Zulu disconnected from voice channel.")
         else:
             await ctx.send("De Zulu is not in de channel")
-    
+
+    async def handle_crypto(self, ctx, text):
+        """fetch crypto data from coinmarketcap"""
+        async with ctx.typing():
+            crypto_data = await asyncio.to_thread(self.crypto.fetch_crypto_data, text)
+            await ctx.send(embed=crypto_data)
+
     async def process_text_input(self, ctx, text):
         """process text through llm and tts pipeline"""
         try:
