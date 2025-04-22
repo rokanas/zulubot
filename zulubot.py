@@ -1,5 +1,6 @@
 # zulubot.py - main bot file
 import os
+import re
 import asyncio
 import threading
 import signal
@@ -14,7 +15,8 @@ from modules.speech_processor import SpeechProcessor
 from modules.llm_client import LLMClient
 from modules.tts_client import TTSClient
 from modules.crypto_client import CryptoClient
-from modules.music_player import MusicPlayer
+from modules.yt_client import YTClient
+from modules.audio_player import AudioPlayer
 
 # unused error message: "De Zulu can track de great wildebeest, but (...)"
 
@@ -37,6 +39,8 @@ class ZuluBot:
         self.llm = LLMClient()
         self.tts = TTSClient()
         self.crypto = CryptoClient()
+        self.yt_client = YTClient()
+        self.audio_player = AudioPlayer()
         self.speech_processor = SpeechProcessor()
         
         # control flags
@@ -76,35 +80,28 @@ class ZuluBot:
             await self.handle_crypto(ctx, text)
 
         @self.bot.command()
-        async def zulumusic(ctx, *, text=""):
-            await self.handle_music(ctx, text)
+        async def zuluplay(ctx, *, text=""):
+            await self.handle_play(ctx, text)
+
+        @self.bot.command()
+        async def zulupause(ctx):
+            await self.handle_pause(ctx)
+
+        @self.bot.command()
+        async def zuluresume(ctx):
+            await self.handle_resume(ctx)
+
+        @self.bot.command()
+        async def zulustop(ctx):
+            await self.handle_stop(ctx)
         
     async def handle_summon(self, ctx):
-        self.stop_event.clear()
+        """connect to voice channel and start speech recognition"""
         
-        # check if summoner is in voice channel
-        if not ctx.author.voice:
-            await ctx.send("Yu ah not in de channel.")
+        connection_success = await self.connect_voice(ctx, suppress_messages=True)
+        if not connection_success:
             return
-        
-        summoner_channel = ctx.author.voice.channel
 
-        # check if zulubot is already in voice channel
-        if ctx.voice_client and ctx.voice_client.is_connected():
-            # if already in summoner's channel, do nothing
-            if ctx.voice_client.channel == summoner_channel:
-                await ctx.send("De Zulu is already in de channel.")
-                return
-            # if in different voice channel, move to summoner's
-            else:
-                await ctx.voice_client.move_to(summoner_channel)
-                await ctx.send(f"De Zulu has moved ova to **{summoner_channel.name}**.")
-                return
-
-        # zulubot joins summoner's voice channel
-        await summoner_channel.connect()
-        await ctx.send(f"De Zulu is hia.")
-        
         # start speech processing if connected to voice
         if ctx.voice_client:
             # create callback to handle transcribed text
@@ -163,27 +160,83 @@ class ZuluBot:
             
             await ctx.send(embed=crypto_data)
 
-    async def handle_music(self, ctx, text):
+    async def handle_play(self, ctx, text):
         """play music from youtube"""
         if not text:
-            await ctx.send("Yu must provide mo info. Use !zuluhelp for de documentation.")
+            await ctx.send("Yu must provide mo info. Use **!zuluhelp** for de documentation.")
             return
         
-        # reuse zulu summon logic
-        self.handle_summon(ctx)
+        # connect to voice channel with suppressed messages
+        connection_success = await self.connect_voice(ctx, suppress_messages=True)
+        if not connection_success:
+            return
 
-        # download and play music
-        await asyncio.to_thread(self.music_player.download_vid, text)
-        music_name = self.music_player.find_music_name()
+        voice_client = ctx.voice_client
+        file_path = None
+
+        if self.is_url(text):
+            file_path, title = await asyncio.to_thread(self.yt_client.download_from_url, text)
+        else:
+            file_path, title = await asyncio.to_thread(self.yt_client.download_from_search, text)
+
+        await self.audio_player.play_file(voice_client, file_path, title)
+            
+        await ctx.send(f"De Zulu is playing: {title}")
+
+    async def handle_pause(self, ctx):
+        """pause current playback"""
+        message = await self.audio_player.pause(ctx.voice_client)
+        await ctx.send(message)
+
+
+    async def handle_resume(self, ctx): 
+        """resume current playback"""
+        message = await self.audio_player.resume(ctx.voice_client)
+        await ctx.send(message)
+
+    async def handle_stop(self, ctx):
+        """stop current playback"""
+        message = await self.audio_player.stop(ctx.voice_client)
+        await ctx.send(message)
+
+    async def connect_voice(self, ctx, suppress_messages=False):
+        """connect bot to voice channel"""
+        self.stop_event.clear()
+
+        # check if summoner is in voice channel
+        if not ctx.author.voice:
+            await ctx.send("Yu ah not in de channel.")
+            return False
         
-        source = discord.FFmpegPCMAudio(music_name)
-        ctx.voice_client.play(source)
+        summoner_channel = ctx.author.voice.channel
 
-        # wait for music to finish playing
-        while ctx.voice_client and ctx.voice_client.is_playing():
-            await asyncio.sleep(0.5)
-
-        print("Listening again for activation phrase: 'Zulubot'")
+        #check if zulubot is already in voice channel
+        if ctx.voice_client and ctx.voice_client.is_connected():
+            # if already in summoner's channel, do nothing
+            if ctx.voice_client.channel == summoner_channel:
+                if not suppress_messages:
+                    await ctx.send("De Zulu is already in de channel.")
+                return True
+            # if in different voice channel, move to summoner's
+            else:
+                try:
+                    await ctx.voice_client.move_to(summoner_channel)
+                    await ctx.send(f"De Zulu has moved ova to **{summoner_channel.name}**.")
+                    return True
+                except Exception as e:
+                    print(f"Error moving to voice channel: {e}")
+                    await ctx.send("De Zulu cannot move to de channel. De path is blocked by lions.")
+                    return False
+            
+        try:
+            # zulubot joins summoner's voice channel
+            await summoner_channel.connect()
+            await ctx.send(f"De Zulu is hia.")
+            return True
+        except Exception as e:
+            print(f"Error connecting to voice channel: {e}")
+            await ctx.send("De Zulu cannot connect to de channel. De path is blocked by lions.")
+            return False
 
     async def process_text_input(self, ctx, text):
         """process text through llm and tts pipeline"""
@@ -216,6 +269,18 @@ class ZuluBot:
         except Exception as e:
             print(f"Error in processing pipeline: {e}")
             await ctx.send(random.choice(self.error_messages))
+
+    # consider moving to utils folder
+    def is_url(self, text):
+        """check if input is url and return boolean"""
+        url_pattern = re.compile(
+            r'^(https?:\/\/)?'          # optional http or https
+            r'(www\.)?'                 # optional www
+            r'([a-zA-Z0-9\-]+\.)+'      # domain name
+            r'[a-zA-Z]{2,}'             # domain suffix
+            r'(\/\S*)?$'                # optional trailing path
+        )
+        return bool(url_pattern.match(text))
     
     # signal handler for graceful shutdown (ctrol+c)
     def signal_handler(self, sig, frame):
