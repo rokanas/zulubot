@@ -25,7 +25,7 @@ class AudioPlayer:
             
             # play audio
             voice_client.play(audio_source, after=lambda e: asyncio.run_coroutine_threadsafe(
-                self._song_finished(e, file_path), voice_client.loop))
+                self._song_finished(e, file_path, title, False), voice_client.loop))
             
             self.is_playing = True
             self.is_paused = False
@@ -36,6 +36,38 @@ class AudioPlayer:
         except Exception as e:
             print(f"Error playing audio: {e}")
             return f"Error playing: {str(e)}", None
+        
+    async def play_stream(self, voice_client, stream_url, title):
+        """play audio directly from stream url"""
+        if voice_client.is_playing():
+            await self.stop(voice_client)
+        
+        try:
+            # create ffmpeg options for streaming
+            ffmpeg_options = {
+                'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+                'options': '-vn'  # disable video
+            }
+            
+            # create audio source from stream url with ffmpeg
+            audio_source = discord.FFmpegPCMAudio(stream_url, **ffmpeg_options)
+            
+            # can add volume control if needed
+            # audio_source = discord.PCMVolumeTransformer(audio_source, volume=0.5)
+            
+            # play audio stream
+            voice_client.play(audio_source, after=lambda e: asyncio.run_coroutine_threadsafe(
+                self._song_finished(e, stream_url, title, True), voice_client.loop))
+            
+            self.is_playing = True
+            self.is_paused = False
+            self.current_track = (stream_url, title)
+            
+            return
+            
+        except Exception as e:
+            print(f"Error streaming audio: {e}")
+            return f"Error streaming: {str(e)}", None
     
     async def pause(self, voice_client):
         """pause current playback"""
@@ -71,19 +103,18 @@ class AudioPlayer:
     
         # stopping also triggers _song_finished callback
 
-    async def _song_finished(self, error, file_path):
-        """called when song finishes playing"""
+    async def _song_finished(self, error, file_path, title, is_stream=False):
+        """called when audio file finishes playing"""
         if error:
             print(f"Error in playback: {error}")
         
         self.is_playing = False
         self.current_track = None
-        self.is_playing = False
         self.is_paused = False
-        self.current_track = None
 
-        # clean up downloaded files when playback finishes
-        await self.cleanup()
+        if not is_stream:
+            # clean up downloaded files when playback finishes
+            await self.cleanup()
         
         # play next song in queue if any
         # if self.queue and len(self.queue) > 0:
@@ -91,19 +122,16 @@ class AudioPlayer:
         #     # implementation for playing next in queue would go here
     
     async def add_to_queue(self, url):
-        """add a URL to the queue"""
+        """add url to queue"""
         self.queue.append(url)
         return f"Added to queue (position {len(self.queue)})"
     
     def get_queue(self):
-        """get the current queue"""
+        """get current queue"""
         return self.queue
     
     async def cleanup(self):
         """delete all downloaded files"""
-
-        print("Cleanup called NOW")
-
         try:
             # add short delay to allow ffmpeg to release file handles
             await asyncio.sleep(2)

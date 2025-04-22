@@ -172,16 +172,25 @@ class ZuluBot:
             return
 
         voice_client = ctx.voice_client
-        file_path = None
+
+        # let user know we're processing
+        processing_msg = await ctx.send("De Zulu is searching for de track...")
 
         if self.is_url(text):
-            file_path, title = await asyncio.to_thread(self.yt_client.download_from_url, text)
+            stream_url, title = await asyncio.to_thread(self.yt_client.get_audio_stream, text)
         else:
-            file_path, title = await asyncio.to_thread(self.yt_client.download_from_search, text)
+            stream_url, title = await asyncio.to_thread(self.yt_client.search_for_url, text)
 
-        await self.audio_player.play_file(voice_client, file_path, title)
-            
-        await ctx.send(f"De Zulu is playing: {title}")
+        # if stream url not found
+        if not stream_url:
+            await processing_msg.edit(content="De Zulu cannot find dis track.")
+            return
+        
+        # play stream
+        await self.audio_player.play_stream(voice_client, stream_url, title)
+
+        # update message
+        await processing_msg.edit(content=f"De Zulu is playing: {title}")
 
     async def handle_pause(self, ctx):
         """pause current playback"""
