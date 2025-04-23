@@ -249,7 +249,7 @@ class ZuluBot:
             "**!zulubegone** - Disconnect de Zulu from de voice channel\n"
             "**!zulucrypto** - Get de crypto data for de top coins\n"
             "**!zulucrypto *<coin_name>* ** - Get de crypto data for de specified coin\n"
-            "**!zuluplay *<youtube_url || search_query>* ** - Play de music from youtube \n"
+            "**!zuluplay *<youtube_url* || *search_query>* ** - Play de music from youtube \n"
             "**!zulupause** - Pause de current playback\n"
             "**!zuluresume** - Resume de current playback\n"
             "**!zuluskip** - Skip current de playback and play de next in queue\n"
