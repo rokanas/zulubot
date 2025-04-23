@@ -277,5 +277,3 @@ class CryptoClient:
         if response.status_code != 200:
             error_msg = f"API returned status code {response.status_code}: {response.text}"
             print(f"Error in {func_name}: {error_msg}")
-            raise ConnectionError(error_msg)
-        return response
