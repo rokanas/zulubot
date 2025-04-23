@@ -202,7 +202,7 @@ class ZuluBot:
 
         # if stream url not found
         if not stream_url:
-            await processing_msg.edit(content="De Zulu cannot find dis track.")
+            await processing_msg.edit(content="De Zulu cannot find dis track. It is probably age-restricted and yu ah but a beby. Zulu will fix anodda time")
             return
         
         # play stream and get resulting message
