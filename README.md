@@ -24,6 +24,8 @@ Bot token and API keys are private so request the ```.env```.
 
 ```!zuluskip``` to skip current playback and play next in queue.
 
+```!zuluqueue``` to display pending items in the playback queue.
+
 ```!zulustop``` to stop all playback and clear the queue.
 
 
