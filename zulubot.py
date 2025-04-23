@@ -64,7 +64,7 @@ class ZuluBot:
             print(f'Logged in as {self.bot.user}!')
         
         @self.bot.command()
-        async def zulusummon(ctx):
+        async def zulusummon(ctx, suppress_messages=False):
             await self.handle_summon(ctx)
 
         @self.bot.command()
@@ -103,31 +103,46 @@ class ZuluBot:
         async def zulustop(ctx):
             await self.handle_stop(ctx)
         
-    async def handle_summon(self, ctx):
-        """connect to voice channel and start speech recognition"""
-        
-        connection_success = await self.connect_voice(ctx, suppress_messages=True)
-        if not connection_success:
-            return
+    async def handle_summon(self, ctx, suppress_messages=False):
+        """connect bot to voice channel"""
+        self.stop_event.clear()
 
-        # start speech processing if connected to voice
-        if ctx.voice_client:
-            # create callback to handle transcribed text
-            async def message_callback(text):
-                await ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
-                await self.process_text_input(ctx, text)
+        # check if summoner is in voice channel
+        if not ctx.author.voice:
+            await ctx.send("Yu ah not in de channel.")
+            return False
+        
+        summoner_channel = ctx.author.voice.channel
+
+        #check if zulubot is already in voice channel
+        if ctx.voice_client and ctx.voice_client.is_connected():
+            # if already in summoner's channel, do nothing
+            if ctx.voice_client.channel == summoner_channel:
+                if not suppress_messages:
+                    await ctx.send("De Zulu is already in de channel.")
+                return True
+            # if in different voice channel, move to summoner's
+            else:
+                try:
+                    await ctx.voice_client.move_to(summoner_channel)
+                    await ctx.send(f"De Zulu has moved ova to **{summoner_channel.name}**.")
+                    asyncio.create_task(self.connect_voice(ctx))
+                    return
+                except Exception as e:
+                    print(f"Error moving to voice channel: {e}")
+                    await ctx.send("De Zulu cannot move to de channel. De path is blocked by lions.")
+                    return False
             
-            # run speech recognition in background
-            await asyncio.to_thread(
-                self.speech_processor.transcribe, 
-                self.stop_event,
-                lambda text: asyncio.run_coroutine_threadsafe(message_callback(text), self.bot.loop)
-            )
-            
-            # disconnect after finishing
-            if ctx.voice_client:
-                await ctx.voice_client.disconnect()
-                await ctx.send("De Zulu is gon.")
+        try:
+            # zulubot joins summoner's voice channel
+            await summoner_channel.connect()
+            await ctx.send(f"De Zulu is hia.")
+            asyncio.create_task(self.connect_voice(ctx))
+            return True
+        except Exception as e:
+            print(f"Error connecting to voice channel: {e}")
+            await ctx.send("De Zulu cannot connect to de channel. De path is blocked by lions.")
+            return False
 
     async def handle_ask(self, ctx, text):
         """process user message from discord text chat"""
@@ -175,9 +190,7 @@ class ZuluBot:
             return
         
         # connect to voice channel with suppressed messages
-        connection_success = await self.connect_voice(ctx, suppress_messages=True)
-        if not connection_success:
-            return
+        await self.handle_summon(ctx, suppress_messages=True)
 
         # let user know we're processing
         processing_msg = await ctx.send("De Zulu is searching for de track...")
@@ -203,7 +216,6 @@ class ZuluBot:
         message = await self.audio_player.pause(ctx.voice_client)
         await ctx.send(message)
 
-
     async def handle_resume(self, ctx): 
         """resume current playback"""
         message = await self.audio_player.resume(ctx.voice_client)
@@ -223,45 +235,27 @@ class ZuluBot:
         """stop current playback"""
         message = await self.audio_player.stop(ctx.voice_client)
         await ctx.send(message)
-
-    async def connect_voice(self, ctx, suppress_messages=False):
-        """connect bot to voice channel"""
-        self.stop_event.clear()
-
-        # check if summoner is in voice channel
-        if not ctx.author.voice:
-            await ctx.send("Yu ah not in de channel.")
-            return False
         
-        summoner_channel = ctx.author.voice.channel
-
-        #check if zulubot is already in voice channel
-        if ctx.voice_client and ctx.voice_client.is_connected():
-            # if already in summoner's channel, do nothing
-            if ctx.voice_client.channel == summoner_channel:
-                if not suppress_messages:
-                    await ctx.send("De Zulu is already in de channel.")
-                return True
-            # if in different voice channel, move to summoner's
-            else:
-                try:
-                    await ctx.voice_client.move_to(summoner_channel)
-                    await ctx.send(f"De Zulu has moved ova to **{summoner_channel.name}**.")
-                    return True
-                except Exception as e:
-                    print(f"Error moving to voice channel: {e}")
-                    await ctx.send("De Zulu cannot move to de channel. De path is blocked by lions.")
-                    return False
+    async def connect_voice(self, ctx):
+        """connect to voice channel and start speech recognition"""
+        # start speech processing if connected to voice
+        if ctx.voice_client:
+            # create callback to handle transcribed text
+            async def message_callback(text):
+                await ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
+                await self.process_text_input(ctx, text)
             
-        try:
-            # zulubot joins summoner's voice channel
-            await summoner_channel.connect()
-            await ctx.send(f"De Zulu is hia.")
-            return True
-        except Exception as e:
-            print(f"Error connecting to voice channel: {e}")
-            await ctx.send("De Zulu cannot connect to de channel. De path is blocked by lions.")
-            return False
+            # run speech recognition in background
+            await asyncio.to_thread(
+                self.speech_processor.transcribe, 
+                self.stop_event,
+                lambda text: asyncio.run_coroutine_threadsafe(message_callback(text), self.bot.loop)
+            )
+            
+            # disconnect after finishing
+            if ctx.voice_client:
+                await ctx.voice_client.disconnect()
+                await ctx.send("De Zulu is gon.")
 
     async def process_text_input(self, ctx, text):
         """process text through llm and tts pipeline"""
