@@ -1,11 +1,13 @@
 # zulubot.py - main bot file
 import os
+import re
 import asyncio
 import threading
 import signal
 import sys
 import random
 from dotenv import load_dotenv
+
 import discord
 from discord.ext import commands
 
@@ -13,6 +15,8 @@ from modules.speech_processor import SpeechProcessor
 from modules.llm_client import LLMClient
 from modules.tts_client import TTSClient
 from modules.crypto_client import CryptoClient
+from modules.yt_client import YTClient
+from modules.audio_player import AudioPlayer
 
 # unused error message: "De Zulu can track de great wildebeest, but (...)"
 
@@ -35,6 +39,8 @@ class ZuluBot:
         self.llm = LLMClient()
         self.tts = TTSClient()
         self.crypto = CryptoClient()
+        self.yt_client = YTClient()
+        self.audio_player = AudioPlayer()
         self.speech_processor = SpeechProcessor()
         
         # control flags
@@ -58,7 +64,7 @@ class ZuluBot:
             print(f'Logged in as {self.bot.user}!')
         
         @self.bot.command()
-        async def zulusummon(ctx):
+        async def zulusummon(ctx, suppress_messages=False):
             await self.handle_summon(ctx)
 
         @self.bot.command()
@@ -72,51 +78,71 @@ class ZuluBot:
         @self.bot.command()
         async def zulucrypto(ctx, *, text=""):
             await self.handle_crypto(ctx, text)
+
+        @self.bot.command()
+        async def zuluplay(ctx, *, text=""):
+            await self.handle_play(ctx, text)
+
+        @self.bot.command()
+        async def zulupause(ctx):
+            await self.handle_pause(ctx)
+
+        @self.bot.command()
+        async def zuluresume(ctx):
+            await self.handle_resume(ctx)
+
+        @self.bot.command()
+        async def zuluskip(ctx):
+            await self.handle_skip(ctx)
+
+        @self.bot.command()
+        async def zuluqueue(ctx):
+            await self.handle_queue(ctx)
+
+        @self.bot.command()
+        async def zulustop(ctx):
+            await self.handle_stop(ctx)
         
-    async def handle_summon(self, ctx):
+    async def handle_summon(self, ctx, suppress_messages=False):
+        """connect bot to voice channel"""
         self.stop_event.clear()
-        
+
         # check if summoner is in voice channel
         if not ctx.author.voice:
             await ctx.send("Yu ah not in de channel.")
-            return
+            return False
         
         summoner_channel = ctx.author.voice.channel
 
-        # check if zulubot is already in voice channel
+        #check if zulubot is already in voice channel
         if ctx.voice_client and ctx.voice_client.is_connected():
             # if already in summoner's channel, do nothing
             if ctx.voice_client.channel == summoner_channel:
-                await ctx.send("De Zulu is already in de channel.")
-                return
+                if not suppress_messages:
+                    await ctx.send("De Zulu is already in de channel.")
+                return True
             # if in different voice channel, move to summoner's
             else:
-                await ctx.voice_client.move_to(summoner_channel)
-                await ctx.send(f"De Zulu has moved ova to **{summoner_channel.name}**.")
-                return
-
-        # zulubot joins summoner's voice channel
-        await summoner_channel.connect()
-        await ctx.send(f"De Zulu is hia.")
-        
-        # start speech processing if connected to voice
-        if ctx.voice_client:
-            # create callback to handle transcribed text
-            async def message_callback(text):
-                await ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
-                await self.process_text_input(ctx, text)
+                try:
+                    await ctx.voice_client.move_to(summoner_channel)
+                    await ctx.send(f"De Zulu has moved ova to **{summoner_channel.name}**.")
+                    asyncio.create_task(self.connect_voice(ctx))
+                    return
+                except Exception as e:
+                    print(f"Error moving to voice channel: {e}")
+                    await ctx.send("De Zulu cannot move to de channel. De path is blocked by lions.")
+                    return False
             
-            # run speech recognition in background
-            await asyncio.to_thread(
-                self.speech_processor.transcribe, 
-                self.stop_event,
-                lambda text: asyncio.run_coroutine_threadsafe(message_callback(text), self.bot.loop)
-            )
-            
-            # disconnect after finishing
-            if ctx.voice_client:
-                await ctx.voice_client.disconnect()
-                await ctx.send("De Zulu is gon.")
+        try:
+            # zulubot joins summoner's voice channel
+            await summoner_channel.connect()
+            await ctx.send(f"De Zulu is hia.")
+            asyncio.create_task(self.connect_voice(ctx))
+            return True
+        except Exception as e:
+            print(f"Error connecting to voice channel: {e}")
+            await ctx.send("De Zulu cannot connect to de channel. De path is blocked by lions.")
+            return False
 
     async def handle_ask(self, ctx, text):
         """process user message from discord text chat"""
@@ -157,6 +183,80 @@ class ZuluBot:
             
             await ctx.send(embed=crypto_data)
 
+    async def handle_play(self, ctx, text):
+        """play music from youtube"""
+        if not text:
+            await ctx.send("Yu must provide mo info. Use **!zuluhelp** for de documentation.")
+            return
+        
+        # connect to voice channel with suppressed messages
+        await self.handle_summon(ctx, suppress_messages=True)
+
+        # let user know we're processing
+        processing_msg = await ctx.send("De Zulu is searching for de track...")
+
+        if self.is_url(text):
+            stream_url, title = await asyncio.to_thread(self.yt_client.get_audio_stream, text)
+        else:
+            stream_url, title = await asyncio.to_thread(self.yt_client.search_for_url, text)
+
+        # if stream url not found
+        if not stream_url:
+            await processing_msg.edit(content="De Zulu cannot find dis track. It is probably age-restricted and yu ah but a beby. Zulu will fix anodda time")
+            return
+        
+        # play stream and get resulting message
+        message = await self.audio_player.play(ctx, stream_url, title, True)
+
+        # update message
+        await processing_msg.edit(content=message)
+
+    async def handle_pause(self, ctx):
+        """pause current playback"""
+        message = await self.audio_player.pause(ctx.voice_client)
+        await ctx.send(message)
+
+    async def handle_resume(self, ctx): 
+        """resume current playback"""
+        message = await self.audio_player.resume(ctx.voice_client)
+        await ctx.send(message)
+
+    async def handle_skip(self, ctx): 
+        """skip current playback in queue"""
+        message = await self.audio_player.skip(ctx.voice_client)
+        await ctx.send(message)
+
+    async def handle_queue(self, ctx): 
+        """display current queue"""
+        message = await self.audio_player.get_queue()
+        await ctx.send(message)
+
+    async def handle_stop(self, ctx):
+        """stop current playback"""
+        message = await self.audio_player.stop(ctx.voice_client)
+        await ctx.send(message)
+        
+    async def connect_voice(self, ctx):
+        """connect to voice channel and start speech recognition"""
+        # start speech processing if connected to voice
+        if ctx.voice_client:
+            # create callback to handle transcribed text
+            async def message_callback(text):
+                await ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
+                await self.process_text_input(ctx, text)
+            
+            # run speech recognition in background
+            await asyncio.to_thread(
+                self.speech_processor.transcribe, 
+                self.stop_event,
+                lambda text: asyncio.run_coroutine_threadsafe(message_callback(text), self.bot.loop)
+            )
+            
+            # disconnect after finishing
+            if ctx.voice_client:
+                await ctx.voice_client.disconnect()
+                await ctx.send("De Zulu is gon.")
+
     async def process_text_input(self, ctx, text):
         """process text through llm and tts pipeline"""
         try:
@@ -188,6 +288,18 @@ class ZuluBot:
         except Exception as e:
             print(f"Error in processing pipeline: {e}")
             await ctx.send(random.choice(self.error_messages))
+
+    # consider moving to utils folder
+    def is_url(self, text):
+        """check if input is url and return boolean"""
+        url_pattern = re.compile(
+            r'^(https?:\/\/)?'          # optional http or https
+            r'(www\.)?'                 # optional www
+            r'([a-zA-Z0-9\-]+\.)+'      # domain name
+            r'[a-zA-Z]{2,}'             # domain suffix
+            r'(\/\S*)?$'                # optional trailing path
+        )
+        return bool(url_pattern.match(text))
     
     # signal handler for graceful shutdown (ctrol+c)
     def signal_handler(self, sig, frame):

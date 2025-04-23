@@ -46,6 +46,8 @@ class CryptoClient:
     @handle_exceptions
     def fetch_coin_data(self, text):
         """fetch data for specific cryptocurrency by name or symbol"""
+        # found coins will contain results from both searches by symbol and slug
+        # if multiple coins found, the one with lowest id (most relevant) is picked
         found_coins = {}
 
         # helper to process api response + add valid entries to found coins list
