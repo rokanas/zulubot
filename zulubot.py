@@ -92,6 +92,14 @@ class ZuluBot:
             await self.handle_resume(ctx)
 
         @self.bot.command()
+        async def zuluskip(ctx):
+            await self.handle_skip(ctx)
+
+        @self.bot.command()
+        async def zuluqueue(ctx):
+            await self.handle_queue(ctx)
+
+        @self.bot.command()
         async def zulustop(ctx):
             await self.handle_stop(ctx)
         
@@ -171,8 +179,6 @@ class ZuluBot:
         if not connection_success:
             return
 
-        voice_client = ctx.voice_client
-
         # let user know we're processing
         processing_msg = await ctx.send("De Zulu is searching for de track...")
 
@@ -186,11 +192,11 @@ class ZuluBot:
             await processing_msg.edit(content="De Zulu cannot find dis track.")
             return
         
-        # play stream
-        await self.audio_player.play_stream(voice_client, stream_url, title)
+        # play stream and get resulting message
+        message = await self.audio_player.play(ctx, stream_url, title, True)
 
         # update message
-        await processing_msg.edit(content=f"De Zulu is playing: {title}")
+        await processing_msg.edit(content=message)
 
     async def handle_pause(self, ctx):
         """pause current playback"""
@@ -201,6 +207,16 @@ class ZuluBot:
     async def handle_resume(self, ctx): 
         """resume current playback"""
         message = await self.audio_player.resume(ctx.voice_client)
+        await ctx.send(message)
+
+    async def handle_skip(self, ctx): 
+        """skip current playback in queue"""
+        message = await self.audio_player.skip(ctx.voice_client)
+        await ctx.send(message)
+
+    async def handle_queue(self, ctx): 
+        """display current queue"""
+        message = await self.audio_player.get_queue()
         await ctx.send(message)
 
     async def handle_stop(self, ctx):
