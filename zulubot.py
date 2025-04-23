@@ -102,6 +102,10 @@ class ZuluBot:
         @self.bot.command()
         async def zulustop(ctx):
             await self.handle_stop(ctx)
+
+        @self.bot.command()
+        async def zuluhelp(ctx):
+            await self.handle_help(ctx)
         
     async def handle_summon(self, ctx, suppress_messages=False):
         """connect bot to voice channel"""
@@ -235,6 +239,25 @@ class ZuluBot:
         """stop current playback"""
         message = await self.audio_player.stop(ctx.voice_client)
         await ctx.send(message)
+
+    async def handle_help(self, ctx):
+        """display list of commands"""
+        commands_list = (
+            "De Zulu is hia to help yu, *mlungu*! Use de following commands:\n\n"
+            "**!zulusummon** - Connect to de voice channel\n"
+            "**!zuluask *<text>* ** - Chat with de Zulu\n"
+            "**!zulubegone** - Disconnect de Zulu from de voice channel\n"
+            "**!zulucrypto** - Get de crypto data for de top coins\n"
+            "**!zulucrypto *<coin_name>* ** - Get de crypto data for de specified coin\n"
+            "**!zuluplay *<youtube_url* || *search_query>* ** - Play de music from youtube \n"
+            "**!zulupause** - Pause de current playback\n"
+            "**!zuluresume** - Resume de current playback\n"
+            "**!zuluskip** - Skip current de playback and play de next in queue\n"
+            "**!zuluqueue** - Display de current queue\n"
+            "**!zulustop** - Stop de current playback and clear de queue\n"
+            "**!zuluhelp** - Display dis help message\n"
+        )
+        await ctx.send(commands_list)
         
     async def connect_voice(self, ctx):
         """connect to voice channel and start speech recognition"""
