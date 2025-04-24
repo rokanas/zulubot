@@ -17,6 +17,7 @@ from modules.tts_client import TTSClient
 from modules.crypto_client import CryptoClient
 from modules.yt_client import YTClient
 from modules.audio_player import AudioPlayer
+from modules.persona import Persona
 from modules.utils import is_url, split_text
 
 # unused error message: "De Zulu can track de great wildebeest, but (...)"
@@ -43,6 +44,7 @@ class ZuluBot:
         self.yt_client = YTClient()
         self.audio_player = AudioPlayer()
         self.speech_processor = SpeechProcessor()
+        self.persona = Persona(persona="Zulu")
         
         # control flags
         self.stop_event = threading.Event()
@@ -108,6 +110,18 @@ class ZuluBot:
             await self.handle_stop(ctx)
 
         @self.bot.command()
+        async def zulusetpersona(ctx, *, text=""):
+            await self.handle_set_persona(ctx, text)
+        
+        @self.bot.command()
+        async def zulupersonas(ctx):
+            await self.handle_get_personas(ctx)
+
+        # @self.bot.command()
+        # async def zuluaddpersona(ctx, *, text=""):
+        #     await self.handle_add_context(ctx)
+
+        @self.bot.command()
         async def zuluhelp(ctx):
             await self.handle_help(ctx)
         
@@ -164,7 +178,7 @@ class ZuluBot:
             await self.process_text_input(ctx, text)
         else:
             # if not in voice channel, respond in text chat (llm only)
-            llm_response = await asyncio.to_thread(self.llm.generate_response, text, self.error_messages)
+            llm_response = await asyncio.to_thread(self.llm.generate_response, text, self.persona.context, self.error_messages)
 
             # in case response is too long, send each section as seperate message
             response_sections = split_text(llm_response, max_chars=self.max_chars)
@@ -248,6 +262,24 @@ class ZuluBot:
         message = await self.audio_player.stop(ctx.voice_client)
         await ctx.send(message)
 
+    async def handle_set_persona(self, ctx, text):
+        """set context for llm"""
+        async with ctx.typing():
+            if not text:
+                await ctx.send("Yu must provide de context.")
+                return
+            
+            # set context in persona
+            message = self.persona.set_persona(text)
+            await ctx.send(message)
+
+    async def handle_get_personas(self, ctx):
+        """get current context for llm"""
+        async with ctx.typing():
+            personas_list = self.persona.get_personas()
+            formatted_list = "\n".join(personas_list)
+            await ctx.send(f"De Zulu present de following personas:\n\n{formatted_list}")
+
     async def handle_help(self, ctx):
         """display list of commands"""
         commands_list = (
@@ -292,12 +324,15 @@ class ZuluBot:
         """process text through llm and tts pipeline"""
         try:
             # get llm response
-            llm_response = await asyncio.to_thread(self.llm.generate_response, text, self.error_messages)
+            llm_response = await asyncio.to_thread(self.llm.generate_response, text, self.persona.context, self.error_messages)
+
+            # in case response is too long, split into sections
+            response_sections = split_text(llm_response, max_chars=self.max_chars)
             
             # convert llm response to speech
             if ctx.voice_client:
-                tts_path = await self.tts.generate_speech(llm_response)
-                
+                tts_path = await self.tts.generate_speech(llm_response, self.persona.voice)
+
                 # play speech in voice channel
                 if tts_path:
                     source = discord.FFmpegPCMAudio(tts_path)
@@ -305,7 +340,6 @@ class ZuluBot:
                     print("LLM response:", llm_response)
 
                     # in case response is too long, send each section as seperate message
-                    response_sections = split_text(llm_response, max_chars=self.max_chars)
                     for section in response_sections:
                         await ctx.send(section)
                     
@@ -317,6 +351,11 @@ class ZuluBot:
                     
                     # clean up audio file
                     os.remove(tts_path)
+                else:
+                    # if tts failed to generate
+                    await ctx.send("De Zulu has lost his tongue and can only type:")
+                    for section in response_sections:
+                        await ctx.send(section)
                 
         except Exception as e:
             print(f"Error in processing pipeline: {e}")
