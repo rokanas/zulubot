@@ -165,6 +165,18 @@ class ZuluBot:
             print(f"Error connecting to voice channel: {e}")
             await ctx.send("De Zulu cannot connect to de channel. De path is blocked by lions.")
             return False
+    
+    async def handle_begone(self, ctx):
+        self.stop_event.set()
+
+        if ctx.voice_client:
+            if ctx.voice_client.is_playing():
+                ctx.voice_client.stop()
+            await ctx.voice_client.disconnect()
+            await ctx.send("De Zulu is gon.")
+            print("Zulu disconnected from voice channel.")
+        else:
+            await ctx.send("De Zulu is not in de channel")
 
     async def handle_ask(self, ctx, text):
         """process user message from discord text chat"""
@@ -185,29 +197,23 @@ class ZuluBot:
             for section in response_sections:
                 await ctx.send(section)
     
-    async def handle_begone(self, ctx):
-        self.stop_event.set()
-
-        if ctx.voice_client:
-            if ctx.voice_client.is_playing():
-                ctx.voice_client.stop()
-            await ctx.voice_client.disconnect()
-            await ctx.send("De Zulu is gon.")
-            print("Zulu disconnected from voice channel.")
-        else:
-            await ctx.send("De Zulu is not in de channel")
-
-    async def handle_crypto(self, ctx, text):
-        """fetch crypto data from coinmarketcap"""
+    async def handle_set_persona(self, ctx, text):
+        """set context for llm"""
         async with ctx.typing():
             if not text:
-                # if user doesn't specify coin, get top coins
-                crypto_data = await asyncio.to_thread(self.crypto.fetch_top_coins)
-            else:
-                # get user specified coin
-                crypto_data = await asyncio.to_thread(self.crypto.fetch_coin_data, text)
+                await ctx.send("Yu must provide de context.")
+                return
             
-            await ctx.send(embed=crypto_data)
+            # set context in persona
+            message = self.persona.set_persona(text)
+            await ctx.send(message)
+
+    async def handle_get_personas(self, ctx):
+        """get current context for llm"""
+        async with ctx.typing():
+            personas_list = self.persona.get_personas()
+            formatted_list = "\n".join(personas_list)
+            await ctx.send(f"De Zulu present de following personas:\n\n{formatted_list}")
 
     async def handle_play(self, ctx, text):
         """play music from youtube"""
@@ -262,39 +268,35 @@ class ZuluBot:
         message = await self.audio_player.stop(ctx.voice_client)
         await ctx.send(message)
 
-    async def handle_set_persona(self, ctx, text):
-        """set context for llm"""
+    async def handle_crypto(self, ctx, text):
+        """fetch crypto data from coinmarketcap"""
         async with ctx.typing():
             if not text:
-                await ctx.send("Yu must provide de context.")
-                return
+                # if user doesn't specify coin, get top coins
+                crypto_data = await asyncio.to_thread(self.crypto.fetch_top_coins)
+            else:
+                # get user specified coin
+                crypto_data = await asyncio.to_thread(self.crypto.fetch_coin_data, text)
             
-            # set context in persona
-            message = self.persona.set_persona(text)
-            await ctx.send(message)
-
-    async def handle_get_personas(self, ctx):
-        """get current context for llm"""
-        async with ctx.typing():
-            personas_list = self.persona.get_personas()
-            formatted_list = "\n".join(personas_list)
-            await ctx.send(f"De Zulu present de following personas:\n\n{formatted_list}")
+            await ctx.send(embed=crypto_data)
 
     async def handle_help(self, ctx):
         """display list of commands"""
         commands_list = (
             "De Zulu is hia to help yu, *mlungu*! Use de following commands:\n\n"
             "**!zulusummon** - Connect to de voice channel\n"
-            "**!zuluask *<text>* ** - Chat with de Zulu\n"
             "**!zulubegone** - Disconnect de Zulu from de voice channel\n"
-            "**!zulucrypto** - Get de crypto data for de top coins\n"
-            "**!zulucrypto *<coin_name>* ** - Get de crypto data for de specified coin\n"
+            "**!zuluask *<text>* ** - Chat with de Zulu\n"
+            "**!zulusetpersona <name>** - Set Zulubot's persona\n"
+            "**!zulupersonas** - Display de list of available personas\n"
             "**!zuluplay *<youtube_url* || *search_query>* ** - Play de music from youtube \n"
             "**!zulupause** - Pause de current playback\n"
             "**!zuluresume** - Resume de current playback\n"
             "**!zuluskip** - Skip current de playback and play de next in queue\n"
             "**!zuluqueue** - Display de current queue\n"
             "**!zulustop** - Stop de current playback and clear de queue\n"
+            "**!zulucrypto** - Get de crypto data for de top coins\n"
+            "**!zulucrypto *<coin_name>* ** - Get de crypto data for de specified coin\n"
             "**!zuluhelp** - Display dis help message\n"
         )
         await ctx.send(commands_list)
