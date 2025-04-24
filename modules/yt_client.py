@@ -15,7 +15,7 @@ class YTClient:
             # options to extract audio url
             ydl_options = {
                 'format': 'bestaudio/best',
-                'quiet': True,          # minimal logging   
+                'quiet': False,         # don't hide logging   
                 'noplaylist': True,     # avoid playlists
                 'extract_audio': True,  # extract audio only
                 'skip_download': True,  # don't download, just get info
@@ -53,7 +53,7 @@ class YTClient:
         try:
             # create yt-dlp search query
             ydl_options = {
-                'quiet': True,          # minimal logging
+                'quiet': False,         # don't hide logging 
                 'extract_flat': True,   # don't download all videos, just fetch urls
                 'noplaylist': True,     # avoid playlists
             }
@@ -89,8 +89,8 @@ class YTClient:
             ydl_options = {
                 'format': 'bestaudio/best',
                 'outtmpl': os.path.join(self.download_dir, '%(title)s.%(ext)s'),
-                'quiet': False,
-                'noplaylist': True
+                'quiet': False,         # don't hide logging
+                'noplaylist': True      # avoid playlists
             }
 
             with yt_dlp.YoutubeDL(ydl_options) as ydl:

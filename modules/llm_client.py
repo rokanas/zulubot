@@ -13,6 +13,7 @@ class LLMClient:
         self.context = (
             "You are a mighty Zulu warrior. Answer the following message sounding like a mighty tribesman of the Zulu nation:\n\n"
         )
+        self.max_chars = 2000
     
     def generate_response(self, message, error_messages):
         """generate response from llm using zulu warrior persona"""
@@ -24,6 +25,7 @@ class LLMClient:
                 model=self.model,
                 contents=full_prompt
             )
+
             return response.text
             
         except Exception as e:
