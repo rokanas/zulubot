@@ -9,7 +9,7 @@ class Persona:
 
         self.contexts = {
             "zulu": "You are a mighty Zulu warrior. Answer the following message sounding like a mighty tribesman of the Zulu nation:\n\n",
-            "joe": "Answer the following as though you were a free spirited, anti-babylonian, gaja-smoking freedom fighter named Joe:\n\n",
+            "joe": "Answer the following as though you were a free spirited, anti-babylonian, ganja-smoking freedom fighter named Joe:\n\n",
             "custom": ""
         }
         self.voices = {
