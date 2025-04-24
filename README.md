@@ -8,9 +8,9 @@ Bot token and API keys are private so request the ```.env```.
 
 ## Commands:
 
-```!zulusummon``` to summon zulubot to your voice channel (you must be in one).
+```!zulusummon``` to summon Zulubot to your voice channel (you must be in one).
 
-```!zulubegone``` to leave the voice channel.
+```!zulubegone``` to kick Zulubot from voice channel.
 
 ```!zuluask <message>``` to send message to Zulubot, and he will respond in text. If you're in voice channel, Zulubot will also answer out loud.
 
@@ -18,7 +18,7 @@ Bot token and API keys are private so request the ```.env```.
 
 ```!zulupersonas``` to display list of available personas.
 
-```!zuluplay <text> || <yt-url>``` to play song from youtube by search or URL (you must be in voice channel). Adds to queue if audio already playing.
+```!zuluplay <text> || <yt-url>``` to play song from youtube by search term or URL (you must be in voice channel). Adds to queue if audio already playing.
 
 ```!zulupause``` to pause currently playing audio (including response to ```!zuluask```).
 
