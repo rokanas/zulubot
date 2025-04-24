@@ -32,8 +32,8 @@ class Persona:
             self.name = self.names[self.current_persona]
             self.context = self.contexts[self.current_persona]
             self.voice = self.voices[self.current_persona]
-            return f"De Zulu has set de context to: {self.name}"
-        return "De Zulu does not recognize dis persona. Use **!zulupersonas** to see de list of valid contexts."
+            return f"De Zulu has set de persona to: {self.name}"
+        return "De Zulu does not recognize dis persona. Use **!zulupersonas** to see de list of valid personas."
     
     def get_personas(self):
         """Return list of available persona names and mark current one"""
