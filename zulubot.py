@@ -17,6 +17,7 @@ from modules.tts_client import TTSClient
 from modules.crypto_client import CryptoClient
 from modules.yt_client import YTClient
 from modules.audio_player import AudioPlayer
+from modules.utils import is_url, split_text
 
 # unused error message: "De Zulu can track de great wildebeest, but (...)"
 
@@ -56,6 +57,9 @@ class ZuluBot:
             "De Zulu lost de battle wit de lion. Try agen soon.",
             "De wisdom of de Zulu is clouded. Try agen soon.",
         ]
+
+        # discord text char limit
+        self.max_chars = 2000
     
     def setup_commands(self):
         """setup zulubot !commands"""
@@ -161,7 +165,11 @@ class ZuluBot:
         else:
             # if not in voice channel, respond in text chat (llm only)
             llm_response = await asyncio.to_thread(self.llm.generate_response, text, self.error_messages)
-            await ctx.send(llm_response)
+
+            # in case response is too long, send each section as seperate message
+            response_sections = split_text(llm_response, max_chars=self.max_chars)
+            for section in response_sections:
+                await ctx.send(section)
     
     async def handle_begone(self, ctx):
         self.stop_event.set()
@@ -199,7 +207,7 @@ class ZuluBot:
         # let user know we're processing
         processing_msg = await ctx.send("De Zulu is searching for de track...")
 
-        if self.is_url(text):
+        if is_url(text):
             stream_url, title = await asyncio.to_thread(self.yt_client.get_audio_stream, text)
         else:
             stream_url, title = await asyncio.to_thread(self.yt_client.search_for_url, text)
@@ -296,8 +304,10 @@ class ZuluBot:
                     ctx.voice_client.play(source)
                     print("LLM response:", llm_response)
 
-                    # always send text response
-                    await ctx.send(f"De Zulu speaks: {llm_response}")
+                    # in case response is too long, send each section as seperate message
+                    response_sections = split_text(llm_response, max_chars=self.max_chars)
+                    for section in response_sections:
+                        await ctx.send(section)
                     
                     # wait for speech to finish playing
                     while ctx.voice_client and ctx.voice_client.is_playing():
@@ -311,18 +321,6 @@ class ZuluBot:
         except Exception as e:
             print(f"Error in processing pipeline: {e}")
             await ctx.send(random.choice(self.error_messages))
-
-    # consider moving to utils folder
-    def is_url(self, text):
-        """check if input is url and return boolean"""
-        url_pattern = re.compile(
-            r'^(https?:\/\/)?'          # optional http or https
-            r'(www\.)?'                 # optional www
-            r'([a-zA-Z0-9\-]+\.)+'      # domain name
-            r'[a-zA-Z]{2,}'             # domain suffix
-            r'(\/\S*)?$'                # optional trailing path
-        )
-        return bool(url_pattern.match(text))
     
     # signal handler for graceful shutdown (ctrol+c)
     def signal_handler(self, sig, frame):
