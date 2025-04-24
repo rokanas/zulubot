@@ -11,6 +11,7 @@ class LLMClient:
         self.client = genai.Client(api_key=api_key)
         self.model = "gemini-2.0-flash"
         self.context = (
+            "Please limit your responses to 2000 characters." 
             "You are a mighty Zulu warrior. Answer the following message sounding like a mighty tribesman of the Zulu nation:\n\n"
         )
     
