@@ -44,7 +44,7 @@ class ZuluBot:
         self.yt_client = YTClient()
         self.audio_player = AudioPlayer()
         self.speech_processor = SpeechProcessor()
-        self.persona = Persona(persona="Zulu")
+        self.persona = Persona()
         
         # control flags
         self.stop_event = threading.Event()
@@ -333,7 +333,7 @@ class ZuluBot:
             
             # convert llm response to speech
             if ctx.voice_client:
-                tts_path = await self.tts.generate_speech(llm_response, self.persona.voice)
+                tts_path = await self.tts.generate_speech(llm_response, self.persona.voice_id)
 
                 # play speech in voice channel
                 if tts_path:
