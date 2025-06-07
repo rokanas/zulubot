@@ -2,6 +2,7 @@
 import os
 import random
 from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 class LLMClient:
@@ -16,12 +17,32 @@ class LLMClient:
         try:
             # combine context with message
             full_prompt = context + message
+
+            # config to disable safety settings         
+            safety_settings=[
+                types.SafetySetting(
+                    category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                    threshold=types.HarmBlockThreshold.BLOCK_NONE,
+                ),
+                types.SafetySetting(
+                    category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                    threshold=types.HarmBlockThreshold.BLOCK_NONE,
+                ),
+                types.SafetySetting(
+                    category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                    threshold=types.HarmBlockThreshold.BLOCK_NONE,
+                ),
+                types.SafetySetting(
+                    category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                    threshold=types.HarmBlockThreshold.BLOCK_NONE,
+                ),
+            ]
             
             response = self.client.models.generate_content(
                 model=self.model,
-                contents=full_prompt
+                contents=full_prompt,
+                config=types.GenerateContentConfig(safety_settings=safety_settings),
             )
-
             return response.text
             
         except Exception as e:
