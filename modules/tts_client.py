@@ -6,19 +6,18 @@ from elevenlabs.client import AsyncElevenLabs
 from dotenv import load_dotenv
 
 class TTSClient:
-    def __init__(self):
+    def __init__(self): # default zulu warrior voice id
         load_dotenv()
         api_key = os.getenv("ELEVENLABS_API_KEY")
         self.client = AsyncElevenLabs(api_key=api_key)
-        self.voice_id = "ddDFRErfhdc2asyySOG5"  # zulu warrior voice id
     
-    async def generate_speech(self, text):
+    async def generate_speech(self, text, voice_id):
         """generate speech from text and save to temporary file"""
         try:
             # elevenlabs sends back audio as stream of chunks
             stream = await self.client.generate(
                 text=text,
-                voice=self.voice_id,
+                voice=voice_id,
                 stream=True
             )
             
