@@ -75,7 +75,11 @@ class ZuluBot:
         @self.bot.command()
         async def zuluask(ctx, *, text=""):
             await self.handle_ask(ctx, text)
-            
+
+        @self.bot.command()
+        async def zulusay(ctx, *, text=""):
+            await self.handle_say(ctx, text)
+
         @self.bot.command()
         async def zulubegone(ctx):
             await self.handle_begone(ctx)
@@ -195,6 +199,41 @@ class ZuluBot:
             response_sections = split_text(llm_response, max_chars=self.max_chars)
             for section in response_sections:
                 await ctx.send(section)
+
+    async def handle_say(self, ctx, text):
+        """narrate user message in voice chat"""
+        # if user provides no text
+        if not text:
+            await ctx.send("Speak tu me, warrior! Yu must provide de text.")
+            return
+        
+        # connect to voice channel with suppressed messages
+        await self.handle_summon(ctx, suppress_messages=True)
+
+        # inform user that zulu is processing
+        processing_msg = await ctx.send("De Zulu is finding his voice...")
+
+        if ctx.voice_client:
+            tts_path = await self.tts.generate_speech(text, self.persona.voice_id)
+
+            # play speech in voice channel
+            if tts_path:
+                source = discord.FFmpegPCMAudio(tts_path)
+                ctx.voice_client.play(source)
+                print("Text:", text)
+                
+                # update message after processing
+                await processing_msg.delete()
+
+                # wait for speech to finish playing
+                while ctx.voice_client and ctx.voice_client.is_playing():
+                    await asyncio.sleep(0.5)
+                
+                # clean up audio file
+                os.remove(tts_path)
+            else:
+                # if tts failed to generate
+                await ctx.send("De Zulu has lost his tongue.")
     
     async def handle_set_persona(self, ctx, text):
         """set context for llm"""
@@ -349,7 +388,7 @@ class ZuluBot:
                     while ctx.voice_client and ctx.voice_client.is_playing():
                         await asyncio.sleep(0.5)
 
-                    print("Listening again for activation phrase: 'Zulubot'")
+                    # print("Listening again for activation phrase: 'Zulubot'")
                     
                     # clean up audio file
                     os.remove(tts_path)
