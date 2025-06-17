@@ -325,6 +325,7 @@ class ZuluBot:
             "**!zulusummon** - Connect to de voice channel\n"
             "**!zulubegone** - Disconnect de Zulu from de voice channel\n"
             "**!zuluask *<text>* ** - Chat with de Zulu\n"
+            "**!zulusay *<text>* ** - Narrate yoh text in de voice channel\n"
             "**!zulusetpersona <name>** - Set Zulubot's persona\n"
             "**!zulupersonas** - Display de list of available personas\n"
             "**!zuluplay *<youtube_url* || *search_query>* ** - Play de music from youtube \n"
