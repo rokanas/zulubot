@@ -14,13 +14,15 @@ Bot token and API keys are private so request the ```.env```.
 
 ```!zuluask <message>``` to send message to Zulubot, and he will respond in text. If you're in voice channel, Zulubot will also answer out loud.
 
+```!zulusay <message>``` to send message to Zulubot, and he will narrate it in voice channel.
+
 ```!zulusetpersona``` to set Zulubot's persona for his spoken answers.
 
 ```!zulupersonas``` to display list of available personas.
 
 ```!zuluplay <text> || <yt-url>``` to play song from youtube by search term or URL (you must be in voice channel). Adds to queue if audio already playing.
 
-```!zulupause``` to pause currently playing audio (including response to ```!zuluask```).
+```!zulupause``` to pause currently playing audio (including response to ```!zuluask``` and ```!zulusay```).
 
 ```!zuluresume``` to resume paused playback.
 
