@@ -19,7 +19,7 @@ class AudioPlayer:
         voice_client = ctx.voice_client
         if voice_client.is_playing():
             # add audio to queue if already playing
-            self.queue.append((source, title, False))
+            self.queue.append((source, title, is_stream))
             return f"Added to de queue: {title} (position {len(self.queue)})"
 
         try:
