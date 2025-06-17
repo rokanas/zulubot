@@ -33,7 +33,7 @@ class AudioPlayer:
                 audio_source = discord.FFmpegPCMAudio(source, **ffmpeg_options)
 
                 # can add volume control if needed
-                # audio_source = discord.PCMVolumeTransformer(audio_source, volume=0.5)
+                audio_source = discord.PCMVolumeTransformer(audio_source, volume=0.5)
 
             else:
                 # create ffmpeg audio source from download filepath
