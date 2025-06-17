@@ -1,6 +1,5 @@
 # zulubot.py - main bot file
 import os
-import re
 import asyncio
 import threading
 import signal
@@ -11,7 +10,7 @@ from dotenv import load_dotenv
 import discord
 from discord.ext import commands
 
-from modules.speech_processor import SpeechProcessor
+# from modules.speech_processor import SpeechProcessor
 from modules.llm_client import LLMClient
 from modules.tts_client import TTSClient
 from modules.crypto_client import CryptoClient
@@ -43,7 +42,7 @@ class ZuluBot:
         self.crypto = CryptoClient()
         self.yt_client = YTClient()
         self.audio_player = AudioPlayer()
-        self.speech_processor = SpeechProcessor()
+        # self.speech_processor = SpeechProcessor()
         self.persona = Persona()
         
         # control flags
@@ -148,7 +147,7 @@ class ZuluBot:
                 try:
                     await ctx.voice_client.move_to(summoner_channel)
                     await ctx.send(f"De Zulu has moved ova to **{summoner_channel.name}**.")
-                    asyncio.create_task(self.connect_voice(ctx))
+                    # asyncio.create_task(self.connect_voice(ctx))
                     return
                 except Exception as e:
                     print(f"Error moving to voice channel: {e}")
@@ -159,7 +158,7 @@ class ZuluBot:
             # zulubot joins summoner's voice channel
             await summoner_channel.connect()
             await ctx.send(f"De Zulu is hia.")
-            asyncio.create_task(self.connect_voice(ctx))
+            # asyncio.create_task(self.connect_voice(ctx))
             return True
         except Exception as e:
             print(f"Error connecting to voice channel: {e}")
@@ -234,7 +233,7 @@ class ZuluBot:
 
         # if stream url not found
         if not stream_url:
-            await processing_msg.edit(content="De Zulu cannot find dis track. It is probably age-restricted and yu ah but a beby. Zulu will fix anodda time")
+            await processing_msg.edit(content="De Zulu cannot find dis track. It is probably age-restricted and yu ah but a bebeh. Zulu will fix anodda time")
             return
         
         # play stream and get resulting message
@@ -299,28 +298,29 @@ class ZuluBot:
             "**!zulucrypto *<coin_name>* ** - Get de crypto data for de specified coin\n"
             "**!zuluhelp** - Display dis help message\n"
         )
-        await ctx.send(commands_list)
+        async with ctx.typing():
+            await ctx.send(commands_list)
         
-    async def connect_voice(self, ctx):
-        """connect to voice channel and start speech recognition"""
-        # start speech processing if connected to voice
-        if ctx.voice_client:
-            # create callback to handle transcribed text
-            async def message_callback(text):
-                await ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
-                await self.process_text_input(ctx, text)
+    # async def connect_voice(self, ctx):
+    #     """connect to voice channel and start speech recognition"""
+    #     # start speech processing if connected to voice
+    #     if ctx.voice_client:
+    #         # create callback to handle transcribed text
+    #         async def message_callback(text):
+    #             await ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
+    #             await self.process_text_input(ctx, text)
             
-            # run speech recognition in background
-            await asyncio.to_thread(
-                self.speech_processor.transcribe, 
-                self.stop_event,
-                lambda text: asyncio.run_coroutine_threadsafe(message_callback(text), self.bot.loop)
-            )
+    #         # run speech recognition in background
+    #         await asyncio.to_thread(
+    #             self.speech_processor.transcribe, 
+    #             self.stop_event,
+    #             lambda text: asyncio.run_coroutine_threadsafe(message_callback(text), self.bot.loop)
+    #         )
             
-            # disconnect after finishing
-            if ctx.voice_client:
-                await ctx.voice_client.disconnect()
-                await ctx.send("De Zulu is gon.")
+    #         # disconnect after finishing
+    #         if ctx.voice_client:
+    #             await ctx.voice_client.disconnect()
+    #             await ctx.send("De Zulu is gon.")
 
     async def process_text_input(self, ctx, text):
         """process text through llm and tts pipeline"""
