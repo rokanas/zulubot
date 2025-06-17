@@ -32,8 +32,8 @@ class AudioPlayer:
                 # create audio source from stream url with ffmpeg
                 audio_source = discord.FFmpegPCMAudio(source, **ffmpeg_options)
 
-                # can add volume control if needed
-                # audio_source = discord.PCMVolumeTransformer(audio_source, volume=0.5)
+                # volume control (to bring in line with speech volume)
+                audio_source = discord.PCMVolumeTransformer(audio_source, volume=0.5)
 
             else:
                 # create ffmpeg audio source from download filepath
