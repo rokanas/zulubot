@@ -14,12 +14,12 @@ class AudioPlayer:
         self.download_dir = "downloads"
         self.text_channel = text_channel
     
-    async def play(self, ctx, source, title, is_stream=False):
+    async def play(self, ctx, source, title, is_stream=False, text_callback=None):
         """play an audio file from filepath or stream url"""
         voice_client = ctx.voice_client
         if voice_client.is_playing():
             # add audio to queue if already playing
-            self.queue.append((source, title, is_stream))
+            self.queue.append((source, title, is_stream, text_callback))
             return f"Added to de queue [position {len(self.queue)}]: {title}"
 
         try:
@@ -45,7 +45,11 @@ class AudioPlayer:
             
             self.is_playing = True
             self.is_paused = False
-            self.current_track = (source, title, is_stream)
+            self.current_track = (source, title, is_stream, text_callback)
+
+            # execute text callback immediately if audio starts playing now
+            if text_callback:
+                await text_callback()
             
             return f"▶️ Now playing: {title}"
             
@@ -151,13 +155,13 @@ class AudioPlayer:
             return
             
         next_item = self.queue.pop(0)
-        source_url, title, is_stream = next_item
+        source_url, title, is_stream, text_callback = next_item
         
         try:
-            await self.play(ctx, source_url, title, is_stream)
-
             # send message to text channel from callback (callback messages need to be explicitly sent back)
             await ctx.send(f"▶️ Now Playing: {title}") 
+
+            await self.play(ctx, source_url, title, is_stream, text_callback)
         
         except Exception as e:
             print(f"Error playing next track: {e}")

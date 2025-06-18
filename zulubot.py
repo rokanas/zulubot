@@ -199,19 +199,20 @@ class ZuluBot:
         processing_msg = await ctx.send("De Zulu is tinking very hard...")
 
         if is_summoned:
-            # send to audio processing pipeline
-            message = await self.process_text(ctx, llm_response, "Zuluask")
+            # send to audio processing pipeline with text callback (for syncing audio+text if queued)
+            message = await self.process_text(ctx, llm_response, "Zuluask", 
+                                            text_callback=lambda: self.send_text_response(ctx, llm_response))
             if message: 
-                await processing_msg.edit(content=message)
-                print("Zuluask txt:", text)
+                if message: 
+                    # response will be 'now playing' or error message
+                    await processing_msg.edit(content=message)
+                    print("Zuluask txt:", text)
         else:
+            # remove processing messsage
             await processing_msg.delete()
 
-        # send response in text chat too
-        # in case response is too long, send each section as seperate message
-        response_sections = split_text(llm_response, max_chars=self.max_chars)
-        for section in response_sections:
-            await ctx.send(section)
+            # send response in text chat too
+            await self.send_text_response(ctx, llm_response)
 
     async def handle_say(self, ctx, text):
         """narrate user message in voice chat"""
@@ -367,7 +368,7 @@ class ZuluBot:
     #             await ctx.voice_client.disconnect()
     #             await ctx.send("De Zulu is gon.")
 
-    async def process_text(self, ctx, text, type):
+    async def process_text(self, ctx, text, type, text_callback=None):
         """process text through tts pipeline"""
         try:
             # convert llm response to speech
@@ -376,7 +377,7 @@ class ZuluBot:
             # play speech in voice channel
             if tts_path:
                 audio_name = f"{type} message [Persona: {self.persona.name}]"
-                message = await self.audio_player.play(ctx, tts_path, audio_name, False)
+                message = await self.audio_player.play(ctx, tts_path, audio_name, False, text_callback)
                 return message
             # if tts fails to generate
             else:
@@ -385,6 +386,13 @@ class ZuluBot:
         except Exception as e:
             print(f"Error in processing pipeline: {e}")
             return random.choice(self.error_messages)
+    
+    async def send_text_response(self, ctx, llm_response):
+        """send text response to chat"""
+        # in case response is too long, send each section as seperate message
+        response_sections = split_text(llm_response, max_chars=self.max_chars)
+        for section in response_sections:
+            await ctx.send(section)
     
     # signal handler for graceful shutdown (ctrol+c)
     def signal_handler(self, sig, frame):
