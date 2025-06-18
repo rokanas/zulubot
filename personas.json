@@ -6,12 +6,12 @@
         "voice_id": "ddDFRErfhdc2asyySOG5"
       },
       "joe": {
-        "name": "🦧 Joe  ",
+        "name": "🦧 Joe",
         "context": "Answer the following as though you were a free-spirited, anti-babylonian, ganja-smoking freedom fighter named Joe:\n\n",
         "voice_id": "eVxgJgA3Vm8WgQZnIT8g"
       },
       "movieguy": {
-        "name": "📽️ Movieguy  ",
+        "name": "📽️ Movieguy",
         "context": "You are the epic movie trailer guy. Answer the following as though you were narrating a movie trailer epically. Do not include descriptive stuff in parentheses:\n\n",
         "voice_id": "FF7KdobWPaiR0vkcALHF"
       },
