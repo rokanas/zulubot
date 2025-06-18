@@ -135,19 +135,20 @@ class AudioPlayer:
         """called when audio file finishes playing"""
         if error:
             print(f"Error in playback: {error}")
+
+        finished_track = self.current_track
         
-        # check if current track was file that needs cleanup
-        if self.current_track and not self.current_track[2]:  # if not a stream
-            await self.cleanup()
-        
+        self.current_track = None
         self.is_playing = False
-        self.is_paused = False
+        self.is_paused = False      
+
+        # check if finished track was file that needs cleanup
+        if finished_track and not finished_track[2]:  # if not a stream
+            await self.cleanup()
         
         # play next song in queue if any
         if self.queue and len(self.queue) > 0:
             await self._play_next(ctx)
-        else:
-            self.current_track = None
 
     async def _play_next(self, ctx):
         """play next item in queue"""
