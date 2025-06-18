@@ -134,7 +134,8 @@ class ZuluBot:
 
         # check if summoner is in voice channel
         if not ctx.author.voice:
-            await ctx.send("Yu ah not in de channel.")
+            if not suppress_messages:
+                await ctx.send("Yu ah not in de channel.")
             return False
         
         summoner_channel = ctx.author.voice.channel
@@ -188,17 +189,29 @@ class ZuluBot:
             await ctx.send("Speak tu me, warrior! Yu must provide de text.")
             return
         
-        if ctx.voice_client and ctx.voice_client.is_connected():
-            # if bot is in voice channel, respond in voice chat (llm and tts pipeline)
-            await self.process_text_input(ctx, text)
-        else:
-            # if not in voice channel, respond in text chat (llm only)
-            llm_response = await asyncio.to_thread(self.llm.generate_response, text, self.persona.context, self.error_messages)
+        # get llm response
+        llm_response = await asyncio.to_thread(self.llm.generate_response, text, self.persona.context, self.error_messages)
+        
+        # connect to voice channel with suppressed messages
+        is_summoned = await self.handle_summon(ctx, suppress_messages=True)
 
-            # in case response is too long, send each section as seperate message
-            response_sections = split_text(llm_response, max_chars=self.max_chars)
-            for section in response_sections:
-                await ctx.send(section)
+        # inform user that zulu is processing
+        processing_msg = await ctx.send("De Zulu is tinking very hard...")
+
+        if is_summoned:
+            # send to audio processing pipeline
+            message = await self.process_text(ctx, llm_response, "Zuluask")
+            if message: 
+                await processing_msg.edit(content=message)
+                print("Zuluask txt:", text)
+        else:
+            await processing_msg.delete()
+
+        # send response in text chat too
+        # in case response is too long, send each section as seperate message
+        response_sections = split_text(llm_response, max_chars=self.max_chars)
+        for section in response_sections:
+            await ctx.send(section)
 
     async def handle_say(self, ctx, text):
         """narrate user message in voice chat"""
@@ -208,27 +221,22 @@ class ZuluBot:
             return
         
         # connect to voice channel with suppressed messages
-        await self.handle_summon(ctx, suppress_messages=True)
+        is_summoned = await self.handle_summon(ctx, suppress_messages=True)
 
-        # inform user that zulu is processing
-        processing_msg = await ctx.send("De Zulu is finding his voice...")
+        if is_summoned:
+            # inform user that zulu is processing
+            processing_msg = await ctx.send("De Zulu is finding his voice...")
+            
+            # send to audio processing pipeline
+            message = await self.process_text(ctx, text, "Zulusay")
 
-        if ctx.voice_client:
-            tts_path = await self.tts.generate_speech(text, self.persona.voice_id)
-
-            # play speech in voice channel
-            if tts_path:
-                # use audio player
-                audio_name = f"{self.persona.name} speech"
-                message = await self.audio_player.play(ctx, tts_path, audio_name, False)
-
-                # update processing message
+            # update processing message
+            if message:
                 await processing_msg.edit(content=message)
-                print("Zulusay txt:", text)
-            else:
-                # if tts failed to generate
-                await ctx.send("De Zulu has lost his tongue.")
-    
+            print("Zulusay txt:", text)
+        else:
+            await ctx.send("De Zulu is not in de voice channel.")
+     
     async def handle_set_persona(self, ctx, text):
         """set context for llm"""
         async with ctx.typing():
@@ -254,26 +262,29 @@ class ZuluBot:
             return
         
         # connect to voice channel with suppressed messages
-        await self.handle_summon(ctx, suppress_messages=True)
+        is_summoned = await self.handle_summon(ctx, suppress_messages=True)
 
-        # let user know we're processing
-        processing_msg = await ctx.send("De Zulu is searching for de track...")
+        if is_summoned:
+            # let user know we're processing
+            processing_msg = await ctx.send("De Zulu is searching for de track...")
 
-        if is_url(text):
-            stream_url, title = await asyncio.to_thread(self.yt_client.get_audio_stream, text)
+            if is_url(text):
+                stream_url, title = await asyncio.to_thread(self.yt_client.get_audio_stream, text)
+            else:
+                stream_url, title = await asyncio.to_thread(self.yt_client.search_for_url, text)
+
+            # if stream url not found
+            if not stream_url:
+                await processing_msg.edit(content="De Zulu cannot find dis track. It is probably age-restricted and yu ah but a bebeh. Zulu will fix anodda time")
+                return
+            
+            # play stream and get resulting message
+            message = await self.audio_player.play(ctx, stream_url, title, True)
+
+            # update message
+            await processing_msg.edit(content=message)
         else:
-            stream_url, title = await asyncio.to_thread(self.yt_client.search_for_url, text)
-
-        # if stream url not found
-        if not stream_url:
-            await processing_msg.edit(content="De Zulu cannot find dis track. It is probably age-restricted and yu ah but a bebeh. Zulu will fix anodda time")
-            return
-        
-        # play stream and get resulting message
-        message = await self.audio_player.play(ctx, stream_url, title, True)
-
-        # update message
-        await processing_msg.edit(content=message)
+            await ctx.send("De Zulu is not in de voice channel.")
 
     async def handle_pause(self, ctx):
         """pause current playback"""
@@ -342,7 +353,7 @@ class ZuluBot:
     #         # create callback to handle transcribed text
     #         async def message_callback(text):
     #             await ctx.send(f"De Zulu has herd yu. Yu sed:\n{text}")
-    #             await self.process_text_input(ctx, text)
+    #             await self.process_text(ctx, text)
             
     #         # run speech recognition in background
     #         await asyncio.to_thread(
@@ -356,46 +367,24 @@ class ZuluBot:
     #             await ctx.voice_client.disconnect()
     #             await ctx.send("De Zulu is gon.")
 
-    async def process_text_input(self, ctx, text):
-        """process text through llm and tts pipeline"""
+    async def process_text(self, ctx, text, type):
+        """process text through tts pipeline"""
         try:
-            # get llm response
-            llm_response = await asyncio.to_thread(self.llm.generate_response, text, self.persona.context, self.error_messages)
-
-            # in case response is too long, split into sections
-            response_sections = split_text(llm_response, max_chars=self.max_chars)
-            
             # convert llm response to speech
-            if ctx.voice_client:
-                tts_path = await self.tts.generate_speech(llm_response, self.persona.voice_id)
+            tts_path = await self.tts.generate_speech(text, self.persona.voice_id)
 
-                # play speech in voice channel
-                if tts_path:
-                    source = discord.FFmpegPCMAudio(tts_path)
-                    ctx.voice_client.play(source)
-                    print("LLM response:", llm_response)
-
-                    # in case response is too long, send each section as seperate message
-                    for section in response_sections:
-                        await ctx.send(section)
-                    
-                    # wait for speech to finish playing
-                    while ctx.voice_client and ctx.voice_client.is_playing():
-                        await asyncio.sleep(0.5)
-
-                    # print("Listening again for activation phrase: 'Zulubot'")
-                    
-                    # clean up audio file
-                    os.remove(tts_path)
-                else:
-                    # if tts failed to generate
-                    await ctx.send("De Zulu has lost his tongue and can only type:")
-                    for section in response_sections:
-                        await ctx.send(section)
+            # play speech in voice channel
+            if tts_path:
+                audio_name = f"{type} message [Persona: {self.persona.name}]"
+                message = await self.audio_player.play(ctx, tts_path, audio_name, False)
+                return message
+            # if tts fails to generate
+            else:
+                return "De Zulu has lost his tongue."
                 
         except Exception as e:
             print(f"Error in processing pipeline: {e}")
-            await ctx.send(random.choice(self.error_messages))
+            return random.choice(self.error_messages)
     
     # signal handler for graceful shutdown (ctrol+c)
     def signal_handler(self, sig, frame):
