@@ -218,16 +218,13 @@ class ZuluBot:
 
             # play speech in voice channel
             if tts_path:
-                source = discord.FFmpegPCMAudio(tts_path)
-
                 # use audio player
                 audio_name = f"{self.persona.name} speech"
-                await self.audio_player.play(ctx, tts_path, audio_name, False)
-                print("Text:", text)
-                
-                # update message after processing
-                await processing_msg.delete()
+                message = await self.audio_player.play(ctx, tts_path, audio_name, False)
 
+                # update processing message
+                await processing_msg.edit(content=message)
+                print("Zulusay txt:", text)
             else:
                 # if tts failed to generate
                 await ctx.send("De Zulu has lost his tongue.")
