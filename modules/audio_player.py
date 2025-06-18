@@ -20,7 +20,7 @@ class AudioPlayer:
         if voice_client.is_playing():
             # add audio to queue if already playing
             self.queue.append((source, title, is_stream))
-            return f"Added to de queue: {title} (position {len(self.queue)})"
+            return f"Added to de queue [position {len(self.queue)}]: {title}"
 
         try:
             if is_stream:
