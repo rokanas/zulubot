@@ -81,6 +81,10 @@ class ZuluBot:
             await self.handle_say(ctx, text)
 
         @self.bot.command()
+        async def zuludraw(ctx, *, text=""):
+            await self.handle_draw(ctx, text)
+
+        @self.bot.command()
         async def zulubegone(ctx):
             await self.handle_begone(ctx)
 
@@ -239,6 +243,50 @@ class ZuluBot:
             print("Zulusay txt:", text)
         else:
             await ctx.send("De Zulu is not in de voice channel.")
+
+    async def handle_draw(self, ctx, text):
+        """generate image from user message"""
+        # if user provides no text
+        if not text:
+            await ctx.send("Yu must provide de description for de image.")
+            return
+
+        # inform user that zulu is processing
+        processing_msg = await ctx.send("De Zulu is crafting de mastahpiece...")
+
+        # generate image using llm
+        llm_response = await asyncio.to_thread(self.llm.generate_image, text, self.persona.context, self.error_messages)
+
+        if llm_response:
+            # result is a tuple of (text_response, image_path) or error_message string
+            if isinstance(llm_response, tuple):
+                text_response, image_path = llm_response
+                
+                # send text response if available
+                if text_response:
+                    await ctx.send(text_response)
+                
+                # send image if available
+                if image_path and os.path.exists(image_path):
+                    try:
+                        with open(image_path, 'rb') as f:
+                            picture = discord.File(f, filename="zulu_creation.png")
+                            await ctx.send(file=picture)
+                        
+                        # clean up the temporary file
+                        os.remove(image_path)
+                        
+                    except Exception as e:
+                        print(f"Error sending image: {e}")
+                        await ctx.send("De Zulu created de mastahpiece but cannot show it to yu.")
+                
+                await processing_msg.delete()
+                print("Zuludraw text:", text)
+            else:
+                # result is an error message
+                await processing_msg.edit(content=llm_response)
+        else:
+            await processing_msg.edit(content="De Zulu cannot draw dis image. Try agen later.")
      
     async def handle_set_persona(self, ctx, text):
         """set context for llm"""
