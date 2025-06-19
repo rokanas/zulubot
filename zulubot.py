@@ -33,9 +33,6 @@ class ZuluBot:
         intents.voice_states = True
         intents.guilds = True
         
-        self.bot = commands.Bot(command_prefix="!", intents=intents)
-        self.setup_commands()
-        
         # initialize clients
         self.llm = LLMClient()
         self.tts = TTSClient()
@@ -64,11 +61,16 @@ class ZuluBot:
 
         # directory with avatar pictures
         self.assets_dir = "assets"
+
+        self.bot = commands.Bot(command_prefix="!", intents=intents)
+        self.setup_commands()
     
     def setup_commands(self):
         """setup zulubot !commands"""
         @self.bot.event
         async def on_ready():
+            # always reset avatar to default persona on startup
+            await self.set_avatar()
             print(f'Logged in as {self.bot.user}!')
         
         @self.bot.command()
@@ -300,30 +302,14 @@ class ZuluBot:
             
             # set persona
             message = self.persona.set_persona(text)
-
             await ctx.send(message)
 
-            try:
-                # construct image path to persona avatar image
-                image_path = os.path.join(self.assets_dir, f"{self.persona.current_persona}.png")
+            # update avatar
+            message = await self.set_avatar()
 
-                # check if assets directory exists
-                if not os.path.exists(self.assets_dir):
-                    await ctx.send(f"Howeva, de assets folda does not exist. De Zulu cannot find his masks.")
-                    return
-                
-                # check if image file exists
-                if not os.path.exists(image_path):
-                    await ctx.send(f"Howeva, de Zulu cannot find his mask in de assets folda.")
-                    return
-                
-                # read and set avatar
-                with open(image_path, 'rb') as image_file:
-                    avatar_data = image_file.read()
-                    await self.bot.user.edit(avatar=avatar_data)
-
-            except:
-                await ctx.sent("Howeva, de Zulu cannot find his mask.")
+            # avatar update only returns message in case of error
+            if message:
+                await ctx.send(message)
                 
 
     async def handle_get_personas(self, ctx):
@@ -470,6 +456,35 @@ class ZuluBot:
         response_sections = split_text(llm_response, max_chars=self.max_chars)
         for section in response_sections:
             await ctx.send(section)
+
+    async def set_avatar(self):
+        """set bot avatar image according to persona"""
+        try:
+            # construct image path to persona avatar image
+            image_path = os.path.join(self.assets_dir, f"{self.persona.current_persona}.png")
+
+            # check if assets directory exists
+            if not os.path.exists(self.assets_dir):
+                return "Howeva, de assets folda does not exist. De Zulu cannot find his masks."
+            
+            # check if image file exists
+            if not os.path.exists(image_path):
+                return "Howeva, de Zulu cannot find his mask in de assets folda."
+            
+            # read and set avatar
+            with open(image_path, 'rb') as image_file:
+                avatar_data = image_file.read()
+                await self.bot.user.edit(avatar=avatar_data)
+                return
+
+        except discord.HTTPException as e:
+            print(f"Error setting avatar: {e}")
+            if e.status == 429 or e.status == 400:  # rate limited or bad request (usually also rate limited)
+                return "Howeva, de Zulu cannot change his mask so quickly."
+
+        except:
+            print(f"Error setting avatar: {e}")
+            return "Howeva, de Zulu cannot find his mask."
     
     # signal handler for graceful shutdown (ctrol+c)
     def signal_handler(self, sig, frame):
