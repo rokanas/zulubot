@@ -23,6 +23,7 @@ class TTSClient:
             stream = await self.client.generate(
                 text=text,
                 voice=voice_id,
+                # model="eleven_multilingual_v2",
                 stream=True
             )
             

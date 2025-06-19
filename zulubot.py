@@ -150,10 +150,13 @@ class ZuluBot:
             # if in different voice channel, move to summoner's
             else:
                 try:
-                    await ctx.voice_client.move_to(summoner_channel)
+                    if ctx.voice_client.is_playing():
+                        ctx.voice_client.stop()
+                    await ctx.voice_client.disconnect()
+                    await asyncio.sleep(0.5) # small delay to ensure clean disconnect
+                    await summoner_channel.connect()
                     await ctx.send(f"De Zulu has moved ova to **{summoner_channel.name}**.")
-                    # asyncio.create_task(self.connect_voice(ctx))
-                    return
+                    return True
                 except Exception as e:
                     print(f"Error moving to voice channel: {e}")
                     await ctx.send("De Zulu cannot move to de channel. De path is blocked by lions.")
@@ -163,7 +166,6 @@ class ZuluBot:
             # zulubot joins summoner's voice channel
             await summoner_channel.connect()
             await ctx.send(f"De Zulu is hia.")
-            # asyncio.create_task(self.connect_voice(ctx))
             return True
         except Exception as e:
             print(f"Error connecting to voice channel: {e}")
