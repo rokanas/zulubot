@@ -61,6 +61,9 @@ class ZuluBot:
 
         # discord text char limit
         self.max_chars = 2000
+
+        # directory with avatar pictures
+        self.assets_dir = "assets"
     
     def setup_commands(self):
         """setup zulubot !commands"""
@@ -295,9 +298,33 @@ class ZuluBot:
                 await ctx.send("Yu must provide de context.")
                 return
             
-            # set context in persona
+            # set persona
             message = self.persona.set_persona(text)
+
             await ctx.send(message)
+
+            try:
+                # construct image path to persona avatar image
+                image_path = os.path.join(self.assets_dir, f"{self.persona.current_persona}.png")
+
+                # check if assets directory exists
+                if not os.path.exists(self.assets_dir):
+                    await ctx.send(f"Howeva, de assets folda does not exist. De Zulu cannot find his masks.")
+                    return
+                
+                # check if image file exists
+                if not os.path.exists(image_path):
+                    await ctx.send(f"Howeva, de Zulu cannot find his mask in de assets folda.")
+                    return
+                
+                # read and set avatar
+                with open(image_path, 'rb') as image_file:
+                    avatar_data = image_file.read()
+                    await self.bot.user.edit(avatar=avatar_data)
+
+            except:
+                await ctx.sent("Howeva, de Zulu cannot find his mask.")
+                
 
     async def handle_get_personas(self, ctx):
         """get current context for llm"""
