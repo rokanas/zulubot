@@ -19,8 +19,6 @@ from modules.audio_player import AudioPlayer
 from modules.persona import Persona
 from modules.utils import is_url, split_text
 
-# unused error message: "De Zulu can track de great wildebeest, but (...)"
-
 # load env variables
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -57,6 +55,7 @@ class ZuluBot:
             "De Zulu lost de battle wit de lion. Try agen soon.",
             "De wisdom of de Zulu is clouded. Try agen soon.",
         ]
+        # unused error message: "De Zulu can track de great wildebeest, but (...)"
 
         # discord text char limit
         self.max_chars = 2000
@@ -68,8 +67,8 @@ class ZuluBot:
         """setup zulubot !commands"""
         @self.bot.event
         async def on_ready():
-            # always reset avatar to default persona on startup
-            await self.set_avatar()
+            # always initialize default persona on startup
+            await self.persona.init_default()
             print(f'Logged in as {self.bot.user}!')
         
         @self.bot.command()
