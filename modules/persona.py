@@ -55,9 +55,12 @@ class Persona:
             self.voice_id = persona_obj["voice_id"]
             return f"De Zulu has set de persona to: {self.name}"
         return "De Zulu does not recognize dis persona. Use **!zulupersonas** to see de list of valid personas."
-    
+        
     def get_personas(self):
         """return list of available persona names (and mark active one)"""
+        if not self.persona_data:
+            return ["Neva mind, no personas exist."]
+    
         persona_list = []
         for key, persona_obj in self.persona_data.items():
             if key == self.current_persona:
