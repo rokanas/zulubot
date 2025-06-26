@@ -32,15 +32,17 @@ class ZuluBot:
         intents.message_content = True
         intents.voice_states = True
         intents.guilds = True
+
+        self.bot = commands.Bot(command_prefix="!", intents=intents)
         
-        # initialize clients
+        # initialize classes & clients
         self.llm = LLMClient()
         self.tts = TTSClient()
         self.crypto = CryptoClient()
         self.yt_client = YTClient()
         self.audio_player = AudioPlayer()
         # self.speech_processor = SpeechProcessor()
-        self.persona = Persona()
+        self.persona = Persona(bot=self.bot)
         
         # control flags
         self.stop_event = threading.Event()
@@ -59,10 +61,7 @@ class ZuluBot:
         # discord text char limit
         self.max_chars = 2000
 
-        # directory with avatar pictures
-        self.assets_dir = "assets"
-
-        self.bot = commands.Bot(command_prefix="!", intents=intents)
+        # setup commands after all initializations
         self.setup_commands()
     
     def setup_commands(self):
@@ -297,20 +296,18 @@ class ZuluBot:
         """set context for llm"""
         async with ctx.typing():
             if not text:
-                await ctx.send("Yu must provide de context.")
+                await ctx.send("Yu must provide de name. Use **!zulupersonas** to see de list of available personas.")
                 return
             
-            # set persona
-            message = self.persona.set_persona(text)
-            await ctx.send(message)
+            # set persona and get both result messages
+            persona_message, avatar_message = await self.persona.set_persona(text)
 
-            # update avatar
-            message = await self.set_avatar()
+            # send persona result message
+            await ctx.send(persona_message)
 
-            # avatar update only returns message in case of error
-            if message:
-                await ctx.send(message)
-                
+            # avatar result message only returns in case of error
+            if avatar_message:
+                await ctx.send(avatar_message)
 
     async def handle_get_personas(self, ctx):
         """get current context for llm"""
