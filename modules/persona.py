@@ -100,6 +100,7 @@ class Persona:
     #     }
     #  
 
+    # separate from __init__ in case of future !zulurefresh command
     def _load_personas(self):
         # load persona data from json file
         try:
@@ -116,7 +117,7 @@ class Persona:
         except Exception as e:
             print(f"Error loading personas: {e}")
 
-    # this is separate from set_persona in case of future !zulurefreshpersonas command
+    # separate from set_persona for future reuse
     def _set_persona_data(self, persona):
             """helper function to set persona data"""      
             # check if specified persona exists   
