@@ -19,8 +19,6 @@ from modules.audio_player import AudioPlayer
 from modules.persona import Persona
 from modules.utils import is_url, split_text
 
-# unused error message: "De Zulu can track de great wildebeest, but (...)"
-
 # load env variables
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -32,18 +30,17 @@ class ZuluBot:
         intents.message_content = True
         intents.voice_states = True
         intents.guilds = True
-        
+
         self.bot = commands.Bot(command_prefix="!", intents=intents)
-        self.setup_commands()
         
-        # initialize clients
+        # initialize classes & clients
         self.llm = LLMClient()
         self.tts = TTSClient()
         self.crypto = CryptoClient()
         self.yt_client = YTClient()
         self.audio_player = AudioPlayer()
         # self.speech_processor = SpeechProcessor()
-        self.persona = Persona()
+        self.persona = Persona(bot=self.bot)
         
         # control flags
         self.stop_event = threading.Event()
@@ -58,14 +55,20 @@ class ZuluBot:
             "De Zulu lost de battle wit de lion. Try agen soon.",
             "De wisdom of de Zulu is clouded. Try agen soon.",
         ]
+        # unused error message: "De Zulu can track de great wildebeest, but (...)"
 
         # discord text char limit
         self.max_chars = 2000
+
+        # setup commands after all initializations
+        self.setup_commands()
     
     def setup_commands(self):
         """setup zulubot !commands"""
         @self.bot.event
         async def on_ready():
+            # always initialize default persona on startup
+            await self.persona.init_default()
             print(f'Logged in as {self.bot.user}!')
         
         @self.bot.command()
@@ -292,12 +295,18 @@ class ZuluBot:
         """set context for llm"""
         async with ctx.typing():
             if not text:
-                await ctx.send("Yu must provide de context.")
+                await ctx.send("Yu must provide de name. Use **!zulupersonas** to see de list of available personas.")
                 return
             
-            # set context in persona
-            message = self.persona.set_persona(text)
-            await ctx.send(message)
+            # set persona and get both result messages
+            persona_message, avatar_message = await self.persona.set_persona(text)
+
+            # send persona result message
+            await ctx.send(persona_message)
+
+            # avatar result message only returns in case of error
+            if avatar_message:
+                await ctx.send(avatar_message)
 
     async def handle_get_personas(self, ctx):
         """get current context for llm"""
@@ -443,6 +452,35 @@ class ZuluBot:
         response_sections = split_text(llm_response, max_chars=self.max_chars)
         for section in response_sections:
             await ctx.send(section)
+
+    async def set_avatar(self):
+        """set bot avatar image according to persona"""
+        try:
+            # construct image path to persona avatar image
+            image_path = os.path.join(self.assets_dir, f"{self.persona.current_persona}.png")
+
+            # check if assets directory exists
+            if not os.path.exists(self.assets_dir):
+                return "Howeva, de assets folda does not exist. De Zulu cannot find his masks."
+            
+            # check if image file exists
+            if not os.path.exists(image_path):
+                return "Howeva, de Zulu cannot find his mask in de assets folda."
+            
+            # read and set avatar
+            with open(image_path, 'rb') as image_file:
+                avatar_data = image_file.read()
+                await self.bot.user.edit(avatar=avatar_data)
+                return
+
+        except discord.HTTPException as e:
+            print(f"Error setting avatar: {e}")
+            if e.status == 429 or e.status == 400:  # rate limited or bad request (usually also rate limited)
+                return "Howeva, de Zulu cannot change his mask so quickly."
+
+        except:
+            print(f"Error setting avatar: {e}")
+            return "Howeva, de Zulu cannot find his mask."
     
     # signal handler for graceful shutdown (ctrol+c)
     def signal_handler(self, sig, frame):
